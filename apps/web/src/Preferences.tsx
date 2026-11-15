@@ -1,8 +1,8 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {MotionConfig} from 'framer-motion';
 type Preferences={font:'Rubik'|'Inter';size:'small'|'normal'|'large';chatBackground:'plain'|'dots'|'grid';reduceMotion:boolean};
-const defaults:Preferences={font:'Rubik',size:'normal',chatBackground:'plain',reduceMotion:false};
-function read():Preferences{try{const raw=JSON.parse(localStorage.getItem('nimb_display_preferences')||'{}');return {font:raw.font==='Inter'?'Inter':'Rubik',size:['small','normal','large'].includes(raw.size)?raw.size:'normal',chatBackground:['plain','dots','grid'].includes(raw.chatBackground)?raw.chatBackground:'plain',reduceMotion:raw.reduceMotion===true}}catch{return defaults}}
+const defaults:Preferences={font:'Inter',size:'normal',chatBackground:'plain',reduceMotion:false};
+function read():Preferences{try{const raw=JSON.parse(localStorage.getItem('nimb_display_preferences')||'{}');return {font:raw.font==='Rubik'?'Rubik':'Inter',size:['small','normal','large'].includes(raw.size)?raw.size:'normal',chatBackground:['plain','dots','grid'].includes(raw.chatBackground)?raw.chatBackground:'plain',reduceMotion:raw.reduceMotion===true}}catch{return defaults}}
 function apply(p:Preferences){document.documentElement.style.setProperty('--nimb-font',`"${p.font}"`);document.documentElement.style.setProperty('--font-scale',String(p.size==='small'?.9:p.size==='large'?1.12:1));document.documentElement.dataset.chatBackground=p.chatBackground;document.documentElement.dataset.reduceMotion=String(p.reduceMotion);window.dispatchEvent(new Event('nimb-motion-change'));}
 export function initializePreferences(){apply(read())}
 export function MotionPreferences({children}:{children:ReactNode}){const [reduce,setReduce]=useState(()=>read().reduceMotion);useEffect(()=>{const update=()=>setReduce(read().reduceMotion);window.addEventListener('nimb-motion-change',update);return()=>window.removeEventListener('nimb-motion-change',update)},[]);return <MotionConfig reducedMotion={reduce?'always':'user'}>{children}</MotionConfig>}

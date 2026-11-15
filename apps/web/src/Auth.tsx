@@ -1,7 +1,245 @@
-import {useEffect,useState} from 'react';
-import {useQueryClient} from '@tanstack/react-query';
-import {ArrowRight} from 'lucide-react';
-type Mode='login'|'register'|'verify'|'forgot'|'reset'|'resend';
-export function Auth(){const params=new URLSearchParams(location.search);const token=params.get('verify')||params.get('reset')||'';const [mode,setMode]=useState<Mode>(params.has('verify')?'verify':params.has('reset')?'reset':'login');const [error,setError]=useState('');const [notice,setNotice]=useState('');const [busy,setBusy]=useState(false);const qc=useQueryClient();useEffect(()=>{const id=new URLSearchParams(location.search).get('user');if(id&&/^[1-9]\d*$/.test(id)){try{sessionStorage.setItem('nimb_pending_profile',id)}catch{}}},[]);function change(next:Mode){setMode(next);setError('');setNotice('')}
-async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError('');setNotice('');const f=Object.fromEntries(new FormData(e.currentTarget));const path=mode==='register'?'/register':mode==='login'?'/login':mode==='verify'?'/verify-email':mode==='forgot'?'/forgot-password':mode==='reset'?'/reset-password':'/resend-verification';try{const response=await fetch('/api'+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='verify'?{token}:mode==='reset'?{token,password:f.password}:f)});const data=await response.json();if(!response.ok)throw new Error(data.error||'Ошибка запроса');if(mode==='login'||mode==='register'||mode==='verify'){const url=new URL(location.href);url.searchParams.delete('verify');url.searchParams.delete('reset');try{const saved=sessionStorage.getItem('nimb_pending_profile');if(saved&&/^[1-9]\d*$/.test(saved)&&!url.searchParams.has('user'))url.searchParams.set('user',saved);sessionStorage.removeItem('nimb_pending_profile')}catch{}history.replaceState(null,'',url.pathname+url.search+url.hash);await qc.invalidateQueries({queryKey:['me']})}else if(mode==='reset'){history.replaceState(null,'',location.pathname);setMode('login');setNotice('Пароль изменён. Теперь войдите в аккаунт.')}else setNotice('Если подходящий аккаунт существует, письмо отправлено. Проверьте почту.')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
-const title={login:'Вход в',register:'Создать аккаунт',verify:'Подтвердить email',forgot:'Восстановить доступ',reset:'Новый пароль',resend:'Письмо для подтверждения'}[mode];const description={login:'Войдите, чтобы продолжить общение.',register:'Начните общаться с теми, кто вам важен.',verify:'Подтвердите адрес, чтобы войти в аккаунт.',forgot:'Отправим ссылку для восстановления доступа.',reset:'Придумайте новый пароль для аккаунта.',resend:'Отправим новую ссылку на вашу почту.'}[mode];return <main className="auth"><div className="auth-grid"><section className="auth-card"><div className="auth-emblem" aria-hidden="true">n.</div><div className="auth-progress" aria-hidden="true"><span/><span/></div><h2>{title}{mode==='login'&&<> <span>nimb</span></>}</h2><p>{description}</p><form onSubmit={submit} className="auth-form">{mode==='register'&&<><label>Как вас зовут<input name="name" maxLength={50} placeholder="Ваше имя" required/></label><label>Имя пользователя<input name="username" pattern="[A-Za-z0-9_]{3,24}" placeholder="Например, nimb_user" required/><small>Латинские буквы, цифры и подчёркивание</small></label></>}{mode==='login'&&<label>Имя пользователя<input name="username" placeholder="Имя пользователя или email" autoComplete="username" required/></label>}{['forgot','resend'].includes(mode)&&<label>Email<input type="email" name="email" required/></label>}{['login','register','reset'].includes(mode)&&<label>Пароль<input type="password" name="password" minLength={mode==='login'?1:10} maxLength={128} placeholder={mode==='login'?'Ваш пароль':'Не менее 10 символов'} required/></label>}{mode==='register'&&<p>Сохраните пароль: восстановление доступа пока недоступно.</p>}{error&&<div className="error">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary" disabled={busy}>{busy?'Подождите…':mode==='login'?'Войти':mode==='register'?'Создать аккаунт':mode==='verify'?'Подтвердить':mode==='reset'?'Сохранить пароль':'Отправить письмо'} <ArrowRight size={18}/></button></form><div className="auth-switch">{mode==='login'?<>Впервые здесь? <button onClick={()=>change('register')}>Создать аккаунт</button></>:<button onClick={()=>change('login')}>Вернуться ко входу</button>}</div></section></div><div className="auth-footer"><span>© nimb</span><span>Ближе друг к другу</span></div></main>}
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, MessageCircle, AtSign } from "lucide-react";
+import { Brand } from "./UI";
+type Mode = "login" | "register" | "verify" | "forgot" | "reset" | "resend";
+export function Auth() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get("verify") || params.get("reset") || "";
+  const [mode, setMode] = useState<Mode>(
+    params.has("verify") ? "verify" : params.has("reset") ? "reset" : "login",
+  );
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const qc = useQueryClient();
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("user");
+    if (id && /^[1-9]\d*$/.test(id)) {
+      try {
+        sessionStorage.setItem("nimb_pending_profile", id);
+      } catch {}
+    }
+  }, []);
+  function change(next: Mode) {
+    setMode(next);
+    setError("");
+    setNotice("");
+  }
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const f = Object.fromEntries(new FormData(e.currentTarget));
+    const path =
+      mode === "register"
+        ? "/register"
+        : mode === "login"
+          ? "/login"
+          : mode === "verify"
+            ? "/verify-email"
+            : mode === "forgot"
+              ? "/forgot-password"
+              : mode === "reset"
+                ? "/reset-password"
+                : "/resend-verification";
+    try {
+      const response = await fetch("/api" + path, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          mode === "verify"
+            ? { token }
+            : mode === "reset"
+              ? { token, password: f.password }
+              : f,
+        ),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Ошибка запроса");
+      if (mode === "login" || mode === "register" || mode === "verify") {
+        const url = new URL(location.href);
+        url.searchParams.delete("verify");
+        url.searchParams.delete("reset");
+        try {
+          const saved = sessionStorage.getItem("nimb_pending_profile");
+          if (
+            saved &&
+            /^[1-9]\d*$/.test(saved) &&
+            !url.searchParams.has("user")
+          )
+            url.searchParams.set("user", saved);
+          sessionStorage.removeItem("nimb_pending_profile");
+        } catch {}
+        history.replaceState(null, "", url.pathname + url.search + url.hash);
+        await qc.invalidateQueries({ queryKey: ["me"] });
+      } else if (mode === "reset") {
+        history.replaceState(null, "", location.pathname);
+        setMode("login");
+        setNotice("Пароль изменён. Теперь войдите в аккаунт.");
+      } else
+        setNotice(
+          "Если подходящий аккаунт существует, письмо отправлено. Проверьте почту.",
+        );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const title = {
+    login: "Вход в",
+    register: "Создать аккаунт",
+    verify: "Подтвердить email",
+    forgot: "Восстановить доступ",
+    reset: "Новый пароль",
+    resend: "Письмо для подтверждения",
+  }[mode];
+  const description = {
+    login: "Войдите, чтобы продолжить общение.",
+    register: "Начните общаться с теми, кто вам важен.",
+    verify: "Подтвердите адрес, чтобы войти в аккаунт.",
+    forgot: "Отправим ссылку для восстановления доступа.",
+    reset: "Придумайте новый пароль для аккаунта.",
+    resend: "Отправим новую ссылку на вашу почту.",
+  }[mode];
+  return (
+    <main className="auth">
+      <header className="auth-top">
+        <Brand />
+        <span>МЕСТО ДЛЯ СВОИХ</span>
+      </header>
+      <div className="auth-grid">
+        <section className="auth-intro">
+          <span className="eyebrow">ПРОСТО БУДЬТЕ НА СВЯЗИ</span>
+          <h1>
+            Ваши люди.
+            <br />
+            Ваши разговоры.
+            <br />
+            Ваш nimb.
+          </h1>
+          <p>
+            Переписывайтесь, делитесь моментами и собирайте своё сообщество.
+          </p>
+          <div className="auth-drawing" aria-hidden="true">
+            <AtSign />
+            <span />
+            <MessageCircle />
+          </div>
+        </section>
+        <section className="auth-card">
+          <h2>
+            {title}
+            {mode === "login" && (
+              <>
+                {" "}
+                <span>nimb</span>
+              </>
+            )}
+          </h2>
+          <p>{description}</p>
+          <form onSubmit={submit} className="auth-form">
+            {mode === "register" && (
+              <>
+                <label>
+                  Как вас зовут
+                  <input
+                    name="name"
+                    maxLength={50}
+                    placeholder="Ваше имя"
+                    required
+                  />
+                </label>
+                <label>
+                  Имя пользователя
+                  <input
+                    name="username"
+                    pattern="[A-Za-z0-9_]{3,24}"
+                    placeholder="Например, nimb_user"
+                    required
+                  />
+                  <small>Латинские буквы, цифры и подчёркивание</small>
+                </label>
+              </>
+            )}
+            {mode === "login" && (
+              <label>
+                Имя пользователя
+                <input
+                  name="username"
+                  placeholder="Имя пользователя или email"
+                  autoComplete="username"
+                  required
+                />
+              </label>
+            )}
+            {["forgot", "resend"].includes(mode) && (
+              <label>
+                Email
+                <input type="email" name="email" required />
+              </label>
+            )}
+            {["login", "register", "reset"].includes(mode) && (
+              <label>
+                Пароль
+                <input
+                  type="password"
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  name="password"
+                  minLength={mode === "login" ? 1 : 10}
+                  maxLength={128}
+                  placeholder={
+                    mode === "login" ? "Ваш пароль" : "Не менее 10 символов"
+                  }
+                  required
+                />
+              </label>
+            )}
+            {mode === "register" && (
+              <p>Сохраните пароль: восстановление доступа пока недоступно.</p>
+            )}
+            {error && <div className="error">{error}</div>}
+            {notice && <div className="notice">{notice}</div>}
+            <button className="primary" disabled={busy}>
+              {busy
+                ? "Подождите…"
+                : mode === "login"
+                  ? "Войти"
+                  : mode === "register"
+                    ? "Создать аккаунт"
+                    : mode === "verify"
+                      ? "Подтвердить"
+                      : mode === "reset"
+                        ? "Сохранить пароль"
+                        : "Отправить письмо"}{" "}
+              <ArrowRight size={18} />
+            </button>
+          </form>
+          <div className="auth-switch">
+            {mode === "login" ? (
+              <>
+                Впервые здесь?{" "}
+                <button onClick={() => change("register")}>
+                  Создать аккаунт
+                </button>
+              </>
+            ) : (
+              <button onClick={() => change("login")}>
+                Вернуться ко входу
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+      <div className="auth-footer">
+        <span>© nimb</span>
+        <span>Ближе друг к другу</span>
+      </div>
+    </main>
+  );
+}
