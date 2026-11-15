@@ -12,7 +12,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "test:e2e": "playwright test",
-    "setup:push": "node scripts/setup-vapid.mjs"
+    "setup:push": "node scripts/setup-vapid.mjs",
+    "prebuild": "npm run db:generate",
+    "start": "npm run db:migrate && NODE_ENV=production STATIC_ROOT=apps/web/dist node apps/api/dist/index.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
