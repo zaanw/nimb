@@ -196,3 +196,24 @@ button,input,textarea,select{-webkit-tap-highlight-color:transparent}
 .post,.post-compose{background:#19191b;border:1px solid #ffffff0d;border-radius:16px}.post-compose textarea{background:#111113;border:1px solid #ffffff12;border-radius:12px;color:#eee}.post{overflow:hidden}
 .modal{background:#19191b;border:1px solid #ffffff15;border-radius:20px;box-shadow:0 22px 70px #000a}.modal input,.modal textarea,.modal select{background:#111113;border-color:#ffffff18;border-radius:10px}
 .wallet-header{border-bottom-color:#ffffff0c}.wallet-intro,.wallet-card{background:#19191b;border-color:#ffffff0d}.wallet-form button,.wallet-result button,.wallet-owned button{background:#303032;border-color:#ffffff18;border-radius:10px;font-weight:600}.wallet-form button:hover,.wallet-result button:hover,.wallet-owned button:hover{background:#3b3b3d}
+
+/* A desktop layout with real navigation and enough room for content. */
+@media(min-width:1000px){
+ .shell,.shell:has(.own-profile),.shell:has(.chat-header){display:flex;width:min(100%,1440px);max-width:1440px;min-height:100dvh;margin:0 auto;background:#0c0c0d;border-inline:1px solid #ffffff0a}
+ .sidebar{display:flex;width:244px;height:100dvh;padding:30px 18px 22px;background:#101011;border-right:1px solid #ffffff10}
+ .side-brand{padding:0 12px;font-size:25px;letter-spacing:-1.2px}.side-brand .brand-mark{font-size:24px;color:#e1e1df}.side-label{margin:52px 12px 14px;color:#77777a;font-size:10px;letter-spacing:.13em}
+ .sidebar nav{display:grid;gap:5px}.sidebar nav button{min-height:48px;padding:12px;border-radius:12px;color:#a8a8aa;font-size:14px}.sidebar nav button:hover{background:#1c1c1e;color:#f2f2f0}.sidebar nav button.active{background:#29292b;color:#f4f4f2;font-weight:600}.sidebar nav svg{width:20px;height:20px}
+ .side-bottom{padding:18px 4px 0;border-top:1px solid #ffffff12}.side-bottom .avatar{width:40px;height:40px;font-size:14px}.side-bottom strong{font-size:13px}.side-bottom small{font-size:12px}
+ .shell .mobile-nav,.shell:has(.own-profile) .mobile-nav{display:none}
+ .shell .main,.shell:has(.own-profile) .main:not(.has-chat){flex:1;width:0;max-width:none;margin:0;padding:38px clamp(28px,5vw,74px) 70px}
+ .shell .screen,.shell:has(.own-profile) .screen{width:100%;max-width:900px;margin:0 auto}
+ .shell:has(.chat-header) .main.has-chat,.shell .main.has-chat{padding:0 28px}
+ .shell:has(.chat-header) .has-chat .screen,.shell .has-chat .screen{max-width:none;height:100dvh}
+}
+.feed-heading{margin:0 0 22px}.feed-heading h1{margin:0;color:#f2f2ef;font-size:30px;line-height:1.15;letter-spacing:-.8px;font-weight:700}.feed-heading p{margin:7px 0 0;color:#969698;font-size:13px}
+.feed-heading+.feed-tabs{margin-top:0}.feed-tabs{justify-content:flex-start;width:100%;margin-bottom:14px}.feed-tabs button{max-width:180px}
+.feed-search{height:48px;margin:0 0 16px;background:#19191b;border:1px solid #ffffff10;border-radius:13px;color:#858588}.feed-search:focus-within{border-color:#777}.feed-search input{padding:12px 0;font-size:14px}
+.post-compose{padding:18px;margin:0 0 16px}.post-compose-head{display:flex;align-items:center;gap:11px;margin-bottom:14px}.post-compose-head .social-avatar{width:42px;height:42px}.post-compose-identity strong,.post-compose-identity small{display:block}.post-compose-identity strong{color:#ededeb;font-size:14px}.post-compose-identity small{margin-top:3px;color:#939396;font-size:12px}
+.post-compose textarea{min-height:74px;padding:13px 14px;resize:vertical;font-size:14px;line-height:1.5}.post-compose textarea:focus-visible{outline:1px solid #777;outline-offset:0}.post-image-picker{padding:10px 0 4px}.post-compose-bottom{padding-top:8px}.post-compose-bottom .primary{margin:0;border-radius:10px;background:#ededeb;color:#171718;font-size:12px;font-weight:650}.post-compose-bottom .primary:disabled{background:#363638;color:#888}
+.feed-empty{display:grid;justify-items:center;gap:8px;margin:26px auto;padding:35px 18px;color:#969699}.feed-empty-icon{margin:0;color:#777;font-size:24px}.feed-empty strong{font-size:14px;font-weight:600}.feed-empty p{margin:0;font-size:13px}
+@media(max-width:720px){.feed-heading{margin-bottom:18px}.feed-heading h1{font-size:26px}.feed-heading p{font-size:12px}.post-compose{padding:15px}.feed-tabs button{max-width:none}.post-compose textarea{font-size:16px}}
