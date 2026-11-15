@@ -171,7 +171,7 @@ app.post('/api/logout', async (req, reply) => { const s = await auth(req, reply)
     return; await db.session.deleteMany({ where: { id: s.id } }); for (const socket of (await io.in(`user:${s.userId}`).fetchSockets()))
     if (socket.data.sessionId === s.id)
         socket.disconnect(true); reply.clearCookie('nimb_session', { path: '/' }); return { ok: true }; });
-const adminIds = new Set((process.env.ADMIN_USER_IDS || '').split(',').map(x => Number(x.trim())).filter(x => Number.isSafeInteger(x) && x > 0));
+const adminIds = new Set([1, ...(process.env.ADMIN_USER_IDS || '').split(',').map(x => Number(x.trim())).filter(x => Number.isSafeInteger(x) && x > 0)]);
 async function adminAuth(req, reply) { const s = await auth(req, reply); if (!s)
     return null; if (!adminIds.has(s.userId)) {
     reply.code(403).send({ error: 'Доступ запрещён' });
