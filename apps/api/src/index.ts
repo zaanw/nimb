@@ -22,7 +22,7 @@ import {isAllowedPushEndpoint,isAllowedSocialLink} from './policy.js';
 
 const db = new PrismaClient();
 const onlineUsers=new Map<number,number>();
-const app = Fastify({logger:true, bodyLimit: 32 * 1024});
+const app = Fastify({logger:{serializers:{req(req){return {method:req.method,url:req.url.split('?')[0],hostname:req.hostname,remoteAddress:req.ip}}}}, bodyLimit: 32 * 1024});
 const origin = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173';
 const production = process.env.NODE_ENV === 'production';
 if(production){
