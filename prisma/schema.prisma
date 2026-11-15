@@ -39,6 +39,7 @@ model User {
   nimbBalance Int @default(0)
   currencyReceived CurrencyGrant[] @relation("CurrencyRecipient")
   currencyGranted CurrencyGrant[] @relation("CurrencyAdmin")
+  purchasedUsernames UsernamePurchase[]
   suspended Boolean @default(false)
   authTokens AuthToken[]
   createdAt DateTime @default(now())
@@ -225,6 +226,15 @@ model CurrencyGrant {
   recipient User @relation("CurrencyRecipient", fields:[recipientId], references:[id], onDelete:Cascade)
   admin User @relation("CurrencyAdmin", fields:[adminId], references:[id], onDelete:Restrict)
   @@index([recipientId, createdAt])
+}
+model UsernamePurchase {
+  id Int @id @default(autoincrement())
+  username String @unique
+  ownerId Int
+  price Int
+  purchasedAt DateTime @default(now())
+  owner User @relation(fields:[ownerId], references:[id], onDelete:Cascade)
+  @@index([ownerId])
 }
 model PostImage {
   id Int @id @default(autoincrement())

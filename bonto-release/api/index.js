@@ -120,6 +120,8 @@ catch {
 } });
 app.post('/api/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const data = account.parse(req.body);
+    if (/^\d+$/.test(data.username))
+        return reply.code(400).send({ error: 'Числовые имена доступны в кошельке' });
     const passwordHash = await argon2.hash(data.password, { type: argon2.argon2id });
     const user = await db.user.create({ data: { username: data.username, name: data.name, passwordHash }, select: publicUser });
     if (user.id <= 100)
@@ -182,7 +184,7 @@ app.get('/api/admin/users', async (req, reply) => { if (!await adminAuth(req, re
 app.post('/api/admin/users/:id/currency', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const { amount } = z.object({ amount: z.number().int().min(1).max(1000000) }).parse(req.body); const result = await db.$transaction(async (tx) => { const updated = await tx.user.updateMany({ where: { id, nimbBalance: { lte: 2147483647 - amount } }, data: { nimbBalance: { increment: amount } } }); if (!updated.count)
     return null; await tx.currencyGrant.create({ data: { adminId: actor.userId, recipientId: id, amount } }); return tx.user.findUniqueOrThrow({ where: { id }, select: { nimbBalance: true } }); }); if (!result)
-    return reply.code(400).send({ error: 'Пользователь не найден или превышен максимальный баланс' }); return { balance: result.nimbBalance }; });
+    return reply.code(400).send({ error: 'Пользователь не найден или превышен максимальный баланс' }); io.to(`user:${id}`).emit('wallet:update'); return { balance: result.nimbBalance }; });
 app.post('/api/admin/users/:id/gifts', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const { template } = z.object({ template: z.enum(['star', 'heart', 'flower', 'comet', 'moon', 'diamond']) }).parse(req.body); if (!await db.user.findUnique({ where: { id }, select: { id: true } }))
     return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.gift.create({ data: { ownerId: id, template, events: { create: { senderId: actor.userId } } } }); io.to(`user:${id}`).emit('gift:new', { userId: id }); return { gift: { id: gift.id } }; });
@@ -453,6 +455,21 @@ app.delete('/api/messages/:id', async (req, reply) => { const s = await auth(req
     catch (err) {
         app.log.error(err);
     } await notifyChat(m.chatId, 'message:delete', { id, chatId: m.chatId }); return { ok: true }; });
+const numericName = z.string().regex(/^[1-9][0-9]{0,5}$/, 'Введите число от 1 до 6 цифр без нулей в начале');
+const usernamePrice = (name) => name.length === 1 ? 10000 : name.length === 2 ? 5000 : 1000;
+app.get('/api/wallet', async (req, reply) => { const s = await auth(req, reply); if (!s)
+    return; const [user, owned] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { nimbBalance: true, username: true } }), db.usernamePurchase.findMany({ where: { ownerId: s.userId }, orderBy: { id: 'desc' }, select: { username: true, price: true, purchasedAt: true } })]); return { balance: user.nimbBalance, username: user.username, owned }; });
+app.get('/api/wallet/check', async (req, reply) => { const s = await auth(req, reply); if (!s)
+    return; const { username } = z.object({ username: numericName }).parse(req.query); const [used, purchase] = await Promise.all([db.user.findUnique({ where: { username }, select: { id: true } }), db.usernamePurchase.findUnique({ where: { username }, select: { ownerId: true } })]); return { username, price: usernamePrice(username), available: !used && !purchase, owned: purchase?.ownerId === s.userId }; });
+app.post('/api/wallet/buy', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
+    return; const { username } = z.object({ username: numericName }).parse(req.body); const price = usernamePrice(username); const result = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${s.userId})`; if (await tx.usernamePurchase.findUnique({ where: { username } }) || await tx.user.findUnique({ where: { username }, select: { id: true } }))
+    return 'taken'; const updated = await tx.user.updateMany({ where: { id: s.userId, nimbBalance: { gte: price } }, data: { nimbBalance: { decrement: price } } }); if (!updated.count)
+    return 'balance'; await tx.usernamePurchase.create({ data: { username, price, ownerId: s.userId } }); await tx.user.update({ where: { id: s.userId }, data: { username } }); return 'ok'; }); if (result === 'taken')
+    return reply.code(409).send({ error: 'Этот юзернейм уже занят' }); if (result === 'balance')
+    return reply.code(400).send({ error: 'Недостаточно нимбиков' }); await announceProfile(s.userId); return { ok: true }; });
+app.post('/api/wallet/activate', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
+    return; const { username } = z.object({ username: numericName }).parse(req.body); const owned = await db.usernamePurchase.findFirst({ where: { username, ownerId: s.userId } }); if (!owned)
+    return reply.code(404).send({ error: 'Этот юзернейм вам не принадлежит' }); await db.user.update({ where: { id: s.userId }, data: { username } }); await announceProfile(s.userId); return { ok: true }; });
 app.get('/api/catalog/gifts', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; return { templates: Object.entries(gifts).map(([id, value]) => ({ id, ...value })) }; });
 app.get('/api/users/:id/badges', async (req, reply) => { const s = await auth(req, reply); if (!s)
