@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "setup:push": "node scripts/setup-vapid.mjs",
     "prebuild": "npm run db:generate",
-    "start": "npm run db:migrate && NODE_ENV=production STATIC_ROOT=apps/web/dist node apps/api/dist/index.js"
+    "start": "npm run db:migrate && NODE_ENV=production STATIC_ROOT=apps/web/dist node apps/api/dist/index.js",
+    "prestart": "npm run build"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",

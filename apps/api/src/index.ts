@@ -29,8 +29,6 @@ if(production){
   const required=['DATABASE_URL','S3_ENDPOINT','S3_REGION','S3_BUCKET','S3_ACCESS_KEY','S3_SECRET_KEY'];
   const missing=required.filter(key=>!process.env[key]?.trim());
   if(!origin.startsWith('https://'))missing.push('APP_ORIGIN (HTTPS)');
-  if(process.env.MAIL_PROVIDER==='brevo'){for(const key of ['BREVO_API_KEY','BREVO_SENDER_EMAIL'])if(!process.env[key]?.trim())missing.push(key)}
-  else if(!process.env.SMTP_HOST?.trim()||!process.env.MAIL_FROM?.trim())missing.push('SMTP_HOST / MAIL_FROM');
   if(missing.length)throw new Error('Для запуска не заданы настройки: '+missing.join(', '));
 }
 
@@ -53,8 +51,8 @@ async function session(token?:string) {
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
   const s = await db.session.findUnique({where:{id:digest(token)},include:{user:{select:publicUser}}});
   if(!s || s.expiresAt <= new Date()) return null;
-  const account=await db.user.findUnique({where:{id:s.userId},select:{emailVerified:true,suspended:true}});
-  return account?.emailVerified && !account.suspended ? s : null;
+  const account=await db.user.findUnique({where:{id:s.userId},select:{email:true,emailVerified:true,suspended:true}});
+  return account && !account.suspended && (!account.email || account.emailVerified) ? s : null;
 }
 async function auth(req:any, reply:any) {
   const s = await session(req.cookies.nimb_session);
@@ -69,28 +67,30 @@ async function setSession(userId:number, reply:any) {
 }
 const sendMail=createMailSender({provider:process.env.MAIL_PROVIDER,brevoApiKey:process.env.BREVO_API_KEY,brevoSenderEmail:process.env.BREVO_SENDER_EMAIL,brevoSenderName:process.env.BREVO_SENDER_NAME,smtpHost:process.env.SMTP_HOST,smtpPort:process.env.SMTP_PORT,smtpSecure:process.env.SMTP_SECURE,smtpUser:process.env.SMTP_USER,smtpPassword:process.env.SMTP_PASSWORD,mailFrom:process.env.MAIL_FROM});
 async function mailToken(userId:number,email:string,kind:'verify'|'reset') {const token=randomBytes(32).toString('hex');await db.$transaction([db.authToken.deleteMany({where:{userId,kind}}),db.authToken.create({data:{id:digest(token),userId,kind,expiresAt:new Date(Date.now()+(kind==='verify'?24*3600_000:3600_000))}})]);const link=`${origin}/?${kind}=${token}`;await sendMail({to:email,subject:kind==='verify'?'Подтвердите email в nimb':'Восстановление пароля nimb',text:`${kind==='verify'?'Подтвердите ваш email':'Для смены пароля откройте ссылку'}:\n${link}\n\nЕсли вы не запрашивали это действие, проигнорируйте письмо.`});}
-const account = z.object({email:z.string().email().max(254).transform(s=>s.toLowerCase()), username:z.string().regex(/^[a-zA-Z0-9_]{3,24}$/).transform(s=>s.toLowerCase()), name:z.string().trim().min(1).max(50), password:z.string().min(10).max(128)});
+const account = z.object({username:z.string().regex(/^[a-zA-Z0-9_]{3,24}$/).transform(s=>s.toLowerCase()), name:z.string().trim().min(1).max(50), password:z.string().min(10).max(128)});
 app.setErrorHandler((err, _req, reply) => {
   if (err instanceof ZodError) return reply.code(400).send({error:'Проверьте введённые данные'});
-  if ((err as any).code === 'P2002') return reply.code(409).send({error:'Email или имя пользователя уже заняты'});
+  if ((err as any).code === 'P2002') return reply.code(409).send({error:'Имя пользователя уже занято'});
   if ((err as any).statusCode && (err as any).statusCode < 500) return reply.code((err as any).statusCode).send({error:(err as Error).message});
   app.log.error(err); return reply.code(500).send({error:'Ошибка сервера'});
 });
 app.get('/api/health',async(_req,reply)=>{try{await db.$queryRaw`SELECT 1`;return {ok:true}}catch{return reply.code(503).send({ok:false})}});
 app.post('/api/register', {config:{rateLimit:{max:5,timeWindow:'1 minute'}}}, async (req, reply) => {
   const data=account.parse(req.body); const passwordHash=await argon2.hash(data.password,{type:argon2.argon2id});
-  const user=await db.user.create({data:{email:data.email, username:data.username, name:data.name, passwordHash},select:publicUser});
-  try{await mailToken(user.id,data.email,'verify')}catch(err){await db.user.delete({where:{id:user.id}});app.log.error(err);return reply.code(503).send({error:'Не удалось отправить письмо. Попробуйте позже.'})} return {verificationRequired:true};
+  const user=await db.user.create({data:{username:data.username, name:data.name, passwordHash},select:publicUser});
+  if(user.id<=100)await db.badgeAward.upsert({where:{userId_badge:{userId:user.id,badge:'early'}},create:{userId:user.id,badge:'early'},update:{}});
+  await setSession(user.id,reply); return {user};
 });
 app.post('/api/login', {config:{rateLimit:{max:5,timeWindow:'1 minute'}}}, async(req, reply)=>{
-  const data=z.object({email:z.string().email().max(254),password:z.string().max(128)}).parse(req.body);
-  const u=await db.user.findUnique({where:{email:data.email.toLowerCase()}});
-  if(!u || !(await argon2.verify(u.passwordHash,data.password))) return reply.code(401).send({error:'Неверный email или пароль'});
-  if(u.suspended)return reply.code(403).send({error:'Аккаунт ограничен администратором'});if(!u.emailVerified)return reply.code(403).send({error:'Подтвердите email по ссылке из письма'}); await setSession(u.id,reply); (req as any).viewerId=u.id;const user=await db.user.findUnique({where:{id:u.id},select:publicUser}); return {user};
+  const data=z.object({username:z.string().trim().min(1).max(254).optional(),email:z.string().email().max(254).optional(),password:z.string().max(128)}).refine(d=>d.username||d.email).parse(req.body);
+  const identifier=(data.username||data.email||'').toLowerCase().replace(/^@/,'');
+  const u=identifier.includes('@')?await db.user.findUnique({where:{email:identifier}}):await db.user.findUnique({where:{username:identifier}});
+  if(!u || !(await argon2.verify(u.passwordHash,data.password))) return reply.code(401).send({error:'Неверное имя пользователя или пароль'});
+  if(u.suspended)return reply.code(403).send({error:'Аккаунт ограничен администратором'});if(u.email&&!u.emailVerified)return reply.code(403).send({error:'Подтвердите email по ссылке из письма'}); await setSession(u.id,reply); (req as any).viewerId=u.id;const user=await db.user.findUnique({where:{id:u.id},select:publicUser}); return {user};
 });
 app.post('/api/verify-email',{config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{const {token}=z.object({token:z.string().regex(/^[a-f0-9]{64}$/)}).parse(req.body);const t=await db.authToken.findUnique({where:{id:digest(token)}});if(!t||t.kind!=='verify'||t.expiresAt<=new Date())return reply.code(400).send({error:'Ссылка недействительна или устарела'});const used=await db.$transaction(async tx=>{const result=await tx.authToken.deleteMany({where:{id:t.id,kind:'verify',expiresAt:{gt:new Date()}}});if(!result.count)return false;await tx.user.update({where:{id:t.userId},data:{emailVerified:true}});if(t.userId<=100)await tx.badgeAward.upsert({where:{userId_badge:{userId:t.userId,badge:'early'}},create:{userId:t.userId,badge:'early'},update:{}});return true});if(!used)return reply.code(400).send({error:'Ссылка уже использована'});await setSession(t.userId,reply);return {ok:true};});
-app.post('/api/resend-verification',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{const {email}=z.object({email:z.string().email().max(254)}).parse(req.body);const u=await db.user.findUnique({where:{email:email.toLowerCase()}});if(u&&!u.emailVerified)try{await mailToken(u.id,u.email,'verify')}catch(err){app.log.error(err)}return {ok:true};});
-app.post('/api/forgot-password',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{const {email}=z.object({email:z.string().email().max(254)}).parse(req.body);const u=await db.user.findUnique({where:{email:email.toLowerCase()}});if(u&&u.emailVerified)try{await mailToken(u.id,u.email,'reset')}catch(err){app.log.error(err)}return {ok:true};});
+app.post('/api/resend-verification',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{const {email}=z.object({email:z.string().email().max(254)}).parse(req.body);const u=await db.user.findUnique({where:{email:email.toLowerCase()}});if(u?.email&&!u.emailVerified)try{await mailToken(u.id,u.email,'verify')}catch(err){app.log.error(err)}return {ok:true};});
+app.post('/api/forgot-password',{config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{const {email}=z.object({email:z.string().email().max(254)}).parse(req.body);const u=await db.user.findUnique({where:{email:email.toLowerCase()}});if(u?.email&&u.emailVerified)try{await mailToken(u.id,u.email,'reset')}catch(err){app.log.error(err)}return {ok:true};});
 app.post('/api/reset-password',{config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{const {token,password}=z.object({token:z.string().regex(/^[a-f0-9]{64}$/),password:z.string().min(10).max(128)}).parse(req.body);const t=await db.authToken.findUnique({where:{id:digest(token)}});if(!t||t.kind!=='reset'||t.expiresAt<=new Date())return reply.code(400).send({error:'Ссылка недействительна или устарела'});const passwordHash=await argon2.hash(password,{type:argon2.argon2id});const used=await db.$transaction(async tx=>{const result=await tx.authToken.deleteMany({where:{id:t.id,kind:'reset',expiresAt:{gt:new Date()}}});if(!result.count)return false;await tx.user.update({where:{id:t.userId},data:{passwordHash}});await tx.session.deleteMany({where:{userId:t.userId}});return true});if(!used)return reply.code(400).send({error:'Ссылка уже использована'});io.in(`user:${t.userId}`).disconnectSockets(true);return {ok:true};});
 app.post('/api/logout',async(req,reply)=>{const s=await auth(req,reply);if(!s)return; await db.session.deleteMany({where:{id:s.id}}); for (const socket of (await io.in(`user:${s.userId}`).fetchSockets())) if (socket.data.sessionId === s.id) socket.disconnect(true); reply.clearCookie('nimb_session',{path:'/'}); return {ok:true};});
 const adminIds=new Set((process.env.ADMIN_USER_IDS||'').split(',').map(x=>Number(x.trim())).filter(x=>Number.isSafeInteger(x)&&x>0));
