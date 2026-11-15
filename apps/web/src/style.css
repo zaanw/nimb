@@ -133,3 +133,12 @@ button,input,textarea,select{-webkit-tap-highlight-color:transparent}
 .auth{background:#0c0c0d}.auth-card{background:#171719;border:1px solid #ffffff14;border-radius:24px}.auth-form label input{background:#202022;border-color:#ffffff12;border-radius:14px}.auth-form .primary{border-radius:14px}.auth-emblem{letter-spacing:-3px}
 @media(max-width:720px){.shell{box-shadow:none}.main:not(.has-chat){padding:24px 18px calc(105px + env(safe-area-inset-bottom))}.chats-heading{margin-bottom:22px}.wallet-chat{margin-bottom:15px}.mobile-nav{bottom:max(10px,env(safe-area-inset-bottom));width:min(560px,calc(100% - 24px))}.has-chat{padding:0 14px}.has-chat .chat-header{padding-top:max(10px,env(safe-area-inset-top))}.message-area{margin:0 -14px;padding:20px 14px}.composer{margin-bottom:max(10px,env(safe-area-inset-bottom))}.profile-hero{padding-top:60px}.auth-card{padding:30px 24px}}
 @media(prefers-reduced-motion:reduce){.heading-icon,.heading-text-button,.wallet-chat,.chats-list .list-item{transition:none}}
+
+/* Give conversations more room on desktop. */
+@media(min-width:1000px){
+  .shell:has(.chat-header){max-width:1100px}
+  .shell:has(.chat-header) .main.has-chat{padding-inline:24px}
+  .shell:has(.chat-header) .has-chat .screen{max-width:none}
+}
+.composer input:focus-visible{outline:none}
+.composer:focus-within{outline:1px solid #777;outline-offset:2px}
