@@ -65,3 +65,20 @@ body{background:#0b0b0b;color:#e6e6e6}.main{max-width:860px;padding-top:38px}.sc
 
 /* Чёрно-белое оформление медиа и значков. */
 .avatar img,.social-avatar img,.community-avatar img,.profile-cover,.community-hero,.gift-tile span,.badge-list span,.gift-detail-icon{filter:grayscale(1)}
+
+/* Quiet, functional chat interface. */
+.chat-empty{max-width:300px;margin:clamp(100px,25vh,230px) auto 0;text-align:center;color:#858585}
+.chat-empty>svg{color:#777}
+.chat-empty h2{margin:17px 0 8px;color:#e7e7e7;font-size:17px;font-weight:600;letter-spacing:0}
+.chat-empty p{margin:0 auto;max-width:270px;font-size:13px;line-height:1.6;color:#8a8a8a}
+.chat-empty button{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;padding:10px 16px;border:1px solid #424242;border-radius:10px;background:#202020;color:#eee;font-size:13px;font-weight:500}
+.chat-empty button:hover{background:#292929}
+.heading-icon,.heading-text-button{background:#181818;box-shadow:none}
+.mobile-nav nav{box-shadow:none;background:#151515f5}
+.mobile-nav button.active{box-shadow:none}
+.conversation-start span{display:none}
+.auth{background:#0b0b0b}
+.auth-card{background:#141414;border-color:#292929;border-radius:20px;box-shadow:none}
+.auth-emblem{width:auto;height:auto;margin:0 auto 24px;background:none;border-radius:0;box-shadow:none;color:#eee;font-size:38px;font-weight:750;letter-spacing:-3px}
+.auth-progress{display:none}
+.auth-form .primary{background:#e5e5e5;border-color:#e5e5e5;color:#171717}
