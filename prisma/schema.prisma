@@ -36,6 +36,9 @@ model User {
   folders ChatFolder[]
   passwordHash String
   emailVerified Boolean @default(false)
+  nimbBalance Int @default(0)
+  currencyReceived CurrencyGrant[] @relation("CurrencyRecipient")
+  currencyGranted CurrencyGrant[] @relation("CurrencyAdmin")
   suspended Boolean @default(false)
   authTokens AuthToken[]
   createdAt DateTime @default(now())
@@ -212,6 +215,16 @@ model GiftEvent {
   createdAt DateTime @default(now())
   gift Gift @relation(fields:[giftId], references:[id], onDelete:Cascade)
   sender User @relation("GiftSender", fields:[senderId], references:[id], onDelete:Cascade)
+}
+model CurrencyGrant {
+  id Int @id @default(autoincrement())
+  recipientId Int
+  adminId Int
+  amount Int
+  createdAt DateTime @default(now())
+  recipient User @relation("CurrencyRecipient", fields:[recipientId], references:[id], onDelete:Cascade)
+  admin User @relation("CurrencyAdmin", fields:[adminId], references:[id], onDelete:Restrict)
+  @@index([recipientId, createdAt])
 }
 model PostImage {
   id Int @id @default(autoincrement())

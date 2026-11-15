@@ -178,7 +178,14 @@ async function adminAuth(req, reply) { const s = await auth(req, reply); if (!s)
 app.get('/api/admin/overview', async (req, reply) => { if (!await adminAuth(req, reply))
     return; const [users, communities, openReports] = await Promise.all([db.user.count(), db.chat.count({ where: { kind: { in: ['group', 'channel'] } } }), db.report.count({ where: { resolvedAt: null } })]); return { users, communities, openReports }; });
 app.get('/api/admin/users', async (req, reply) => { if (!await adminAuth(req, reply))
-    return; const { q } = z.object({ q: z.string().trim().max(50).default('') }).parse(req.query); return { users: await db.user.findMany({ where: q ? { OR: [{ username: { contains: q.toLowerCase() } }, { name: { contains: q, mode: 'insensitive' } }] } : {}, select: { id: true, username: true, name: true, createdAt: true, suspended: true }, orderBy: { id: 'desc' }, take: 100 }) }; });
+    return; const { q } = z.object({ q: z.string().trim().max(50).default('') }).parse(req.query); return { users: await db.user.findMany({ where: q ? { OR: [{ username: { contains: q.toLowerCase().replace(/^@/, '') } }, { name: { contains: q, mode: 'insensitive' } }, ...(/^\d{1,9}$/.test(q) ? [{ id: Number(q) }] : [])] } : {}, select: { id: true, username: true, name: true, createdAt: true, suspended: true, nimbBalance: true }, orderBy: { id: 'desc' }, take: 100 }) }; });
+app.post('/api/admin/users/:id/currency', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
+    return; const id = z.coerce.number().int().positive().parse(req.params.id); const { amount } = z.object({ amount: z.number().int().min(1).max(1000000) }).parse(req.body); const result = await db.$transaction(async (tx) => { const updated = await tx.user.updateMany({ where: { id, nimbBalance: { lte: 2147483647 - amount } }, data: { nimbBalance: { increment: amount } } }); if (!updated.count)
+    return null; await tx.currencyGrant.create({ data: { adminId: actor.userId, recipientId: id, amount } }); return tx.user.findUniqueOrThrow({ where: { id }, select: { nimbBalance: true } }); }); if (!result)
+    return reply.code(400).send({ error: 'Пользователь не найден или превышен максимальный баланс' }); return { balance: result.nimbBalance }; });
+app.post('/api/admin/users/:id/gifts', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
+    return; const id = z.coerce.number().int().positive().parse(req.params.id); const { template } = z.object({ template: z.enum(['star', 'heart', 'flower', 'comet', 'moon', 'diamond']) }).parse(req.body); if (!await db.user.findUnique({ where: { id }, select: { id: true } }))
+    return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.gift.create({ data: { ownerId: id, template, events: { create: { senderId: actor.userId } } } }); io.to(`user:${id}`).emit('gift:new', { userId: id }); return { gift: { id: gift.id } }; });
 app.get('/api/admin/reports', async (req, reply) => { if (!await adminAuth(req, reply))
     return; return { reports: await db.report.findMany({ where: { resolvedAt: null }, select: { id: true, reason: true, createdAt: true, reporter: { select: { id: true, username: true, name: true } }, reported: { select: { id: true, username: true, name: true, suspended: true } } }, orderBy: { id: 'desc' }, take: 100 }) }; });
 app.post('/api/admin/reports/:id/resolve', async (req, reply) => { if (!await adminAuth(req, reply))
@@ -605,7 +612,7 @@ else {
 app.delete('/api/push/subscriptions', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; await db.pushSubscription.deleteMany({ where: { sessionId: s.id } }); return { ok: true }; });
 app.get('/api/me/account', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const user = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { email: true, username: true, createdAt: true, emailVerified: true } }); return { account: user }; });
+    return; const user = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { email: true, username: true, createdAt: true, emailVerified: true, nimbBalance: true } }); return { account: user }; });
 app.get('/api/me/storage', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const totals = await db.attachment.aggregate({ where: { message: { senderId: s.userId } }, _sum: { size: true }, _count: { id: true } }); return { chatAttachments: { count: totals._count.id, bytes: totals._sum.size || 0 } }; });
 app.get('/api/folders', async (req, reply) => { const s = await auth(req, reply); if (!s)

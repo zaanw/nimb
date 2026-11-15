@@ -1,0 +1,9 @@
+ALTER TABLE "User" ADD COLUMN "nimbBalance" INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE "CurrencyGrant" (
+  "id" SERIAL PRIMARY KEY,
+  "recipientId" INTEGER NOT NULL REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  "adminId" INTEGER NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  "amount" INTEGER NOT NULL CHECK ("amount" > 0),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX "CurrencyGrant_recipientId_createdAt_idx" ON "CurrencyGrant"("recipientId", "createdAt");
