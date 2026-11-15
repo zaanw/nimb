@@ -84,3 +84,52 @@ body{background:#0b0b0b;color:#e6e6e6}.main{max-width:860px;padding-top:38px}.sc
 .auth-form .primary{background:#e5e5e5;border-color:#e5e5e5;color:#171717}
 .admin-items .admin-balance{color:#aaa;font-size:13px;margin:12px 0}.admin-items .admin-balance strong{color:#eee}.admin-grant{display:flex;align-items:end;gap:8px;margin-top:12px}.admin-grant label{flex:1;min-width:0}.admin-grant input,.admin-grant select{width:100%;min-width:0;min-height:40px;padding:9px;border:1px solid #444;border-radius:9px;background:#151515;color:#eee}.admin-items .admin-grant button{margin:0;white-space:nowrap}
 .wallet-chat{padding:13px 3px}.wallet-chat-avatar,.wallet-avatar{display:grid;place-items:center;flex:none;border-radius:50%;background:#e4e4e4;color:#161616}.wallet-chat-avatar{width:46px;height:46px;font-size:25px}.wallet-screen{height:100dvh;display:flex;flex-direction:column}.wallet-header{display:flex;align-items:center;gap:12px;min-height:74px;border-bottom:1px solid #262626}.wallet-avatar{width:42px;height:42px}.wallet-header strong,.wallet-header small{display:block}.wallet-header small{font-size:12px;color:#929292;margin-top:4px}.wallet-content{overflow:auto;padding:20px 0 calc(100px + env(safe-area-inset-bottom))}.wallet-intro,.wallet-card{margin-bottom:14px;padding:18px;background:#1b1b1b;border:1px solid #2b2b2b;border-radius:16px}.wallet-intro strong{font-size:14px}.wallet-intro p,.wallet-card p{color:#a7a7a7;font-size:13px;line-height:1.55}.wallet-card>span{display:block;color:#a6a6a6;font-size:13px}.wallet-card>strong{display:block;margin-top:8px;font-size:26px}.wallet-card>strong small{font-size:13px;font-weight:400;color:#aaa}.wallet-card h2{margin:0;font-size:17px}.wallet-form{display:flex;gap:8px}.wallet-form label{flex:1;min-width:0}.wallet-form input{height:44px;font-size:16px;padding:10px 12px}.wallet-form button,.wallet-result button,.wallet-owned button{border:1px solid #555;border-radius:10px;background:#303030;color:#fff;padding:10px 13px}.wallet-result,.wallet-owned{display:flex;gap:10px;align-items:center;justify-content:space-between;border-top:1px solid #343434;padding-top:12px;margin-top:12px;font-size:13px}.wallet-owned small,.wallet-notice{color:#aaa}.wallet-notice{font-size:13px}
+
+/* Nimb: a calm monochrome messenger. */
+:root{color:#f1f0ed;background:#101011}
+body{background:#101011;color:#f1f0ed}
+button,input,textarea,select{-webkit-tap-highlight-color:transparent}
+.shell{background:#0c0c0d;box-shadow:0 0 0 1px #ffffff0a}
+.main:not(.has-chat){padding-top:32px}
+.chats-heading{gap:10px;margin-bottom:26px}
+.chats-heading>div{font-size:19px;font-weight:650;letter-spacing:-.35px}
+.chats-heading .avatar{width:30px;height:30px;background:#2a2a2c;color:#f1f0ed;font-size:12px}
+.heading-icon,.heading-text-button{height:44px;background:#1b1b1d;color:#e9e8e6;border:1px solid #ffffff09;transition:background .16s,border-color .16s}
+.heading-icon{width:44px}.heading-text-button{font-size:13px;font-weight:600;padding:0 17px}
+.heading-icon:hover,.heading-text-button:hover{background:#28282a;border-color:#ffffff1a}
+.chats-search,.settings-search{height:48px;padding:0 15px;background:#1b1b1d;border:1px solid #ffffff0c;border-radius:13px;color:#818184}
+.chats-search:focus-within,.settings-search:focus-within{border-color:#767679;background:#202022}
+.chats-search input,.settings-search input{height:100%;font-size:14px;color:#eee}
+.wallet-chat{margin:0 0 16px;padding:13px 14px;border:1px solid #ffffff10;border-radius:16px;background:#19191b;transition:background .16s,border-color .16s}
+.wallet-chat:hover{background:#222224;border-color:#ffffff20}
+.wallet-chat-avatar,.wallet-avatar{background:#ecebe8;color:#181819;border:1px solid #ffffff18}
+.wallet-chat-avatar{width:46px;height:46px;font-size:24px}
+.wallet-chat .item-copy strong{font-size:14px;font-weight:650}.wallet-chat .item-copy small{font-size:12px;color:#919194;margin-top:5px}
+.wallet-chat>svg{width:17px;color:#77777b}
+.chats-section-label{display:flex;align-items:center;justify-content:space-between;margin:24px 6px 7px;color:#89898b;font-size:12px;font-weight:600;letter-spacing:.02em}
+.chats-section-label span:last-child{color:#66666a;font-weight:500}
+.chats-list{margin:0}.chats-list .list-item{min-height:72px;padding:11px 10px;border-radius:14px;transition:background .16s}
+.chats-list .list-item:hover{background:#1a1a1c}.chats-list .avatar{height:48px;width:48px;background:#2f3032;color:#f0efed;font-size:17px}
+.item-copy strong{font-size:14px;font-weight:650;letter-spacing:-.1px}.item-copy small{font-size:13px;color:#919194;margin-top:5px}
+.chat-list-time{align-self:flex-start;flex:none;margin:4px 0 0 8px;color:#77777b;font-size:11px}
+.chat-empty{margin-top:clamp(90px,22vh,190px)}.chat-empty button{background:#ecebe8;border-color:#ecebe8;color:#181819;font-weight:600}.chat-empty button:hover{background:#fff}
+.mobile-nav nav{background:#19191bf5;border:1px solid #ffffff12;box-shadow:0 10px 35px #0008;border-radius:22px;backdrop-filter:blur(18px)}
+.mobile-nav button{border:0;border-radius:16px;color:#969699;min-height:58px;font-size:10px;font-weight:550}
+.mobile-nav button.active{background:#303032;border:0;color:#f5f4f1;box-shadow:none}
+.mobile-nav button svg{width:21px;height:21px;stroke-width:1.8}
+.chat-header,.wallet-header{min-height:70px;gap:10px;border-bottom:1px solid #ffffff0d}
+.chat-header .person-button{background:transparent}.chat-header .avatar{width:40px;height:40px}
+.chat-header .person-button strong{font-size:14px}.chat-header .person-button small{font-size:12px;color:#939397}
+.message-area{background-color:#101011}.message-row .bubble{background:#242426;border:1px solid #ffffff09;color:#efeeeb;border-radius:16px 16px 16px 5px;padding:10px 13px;line-height:1.45}
+.message-row.mine .bubble{background:#414143;border-color:#ffffff0c;border-radius:16px 16px 5px 16px}
+.message-date{color:#aaa;background:#151517;border:1px solid #ffffff0a;border-radius:20px;font-size:11px;padding:5px 10px}
+.composer{background:#1d1d1f;border:1px solid #ffffff12;border-radius:18px;padding:5px 8px}.composer:focus-within{border-color:#777}
+.composer input{color:#eee}.composer button{background:#ecebe8;color:#191919;border-radius:12px}.composer button:disabled{background:#343436;color:#858589}
+.settings-heading h1{font-weight:700;letter-spacing:-1.2px}.settings-profile,.settings-list{background:#1a1a1c;border:1px solid #ffffff0b;box-shadow:none;border-radius:16px;overflow:hidden}
+.settings-profile{padding:14px}.settings-list button{min-height:59px}.setting-icon{border-radius:10px}
+.profile-hero .avatar.large{border:4px solid #0c0c0d;box-shadow:0 0 0 1px #ffffff1a}.profile-title h1{font-size:25px;font-weight:700;letter-spacing:-.5px}
+.profile-details{padding-top:4px}.profile-tabs{gap:8px}.profile-tabs button{border:1px solid #ffffff0c;background:#1d1d1f}.profile-tabs button.active{background:#ededeb;color:#171718}
+.wallet-intro,.wallet-card{background:#1a1a1c;border:1px solid #ffffff0d;border-radius:16px}.wallet-content{padding-top:20px}.wallet-card>strong{letter-spacing:-.8px}
+.auth{background:#0c0c0d}.auth-card{background:#171719;border:1px solid #ffffff14;border-radius:24px}.auth-form label input{background:#202022;border-color:#ffffff12;border-radius:14px}.auth-form .primary{border-radius:14px}.auth-emblem{letter-spacing:-3px}
+@media(max-width:720px){.shell{box-shadow:none}.main:not(.has-chat){padding:24px 18px calc(105px + env(safe-area-inset-bottom))}.chats-heading{margin-bottom:22px}.wallet-chat{margin-bottom:15px}.mobile-nav{bottom:max(10px,env(safe-area-inset-bottom));width:min(560px,calc(100% - 24px))}.has-chat{padding:0 14px}.has-chat .chat-header{padding-top:max(10px,env(safe-area-inset-top))}.message-area{margin:0 -14px;padding:20px 14px}.composer{margin-bottom:max(10px,env(safe-area-inset-bottom))}.profile-hero{padding-top:60px}.auth-card{padding:30px 24px}}
+@media(prefers-reduced-motion:reduce){.heading-icon,.heading-text-button,.wallet-chat,.chats-list .list-item{transition:none}}
