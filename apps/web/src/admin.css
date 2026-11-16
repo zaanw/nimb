@@ -1709,3 +1709,16 @@
     background-position: 45% top;
   }
 }
+
+/* Owner badge management */
+.control-owner-badges{margin:20px 0;padding:20px;border:1px solid rgba(255,255,255,.10);border-radius:22px;background:linear-gradient(145deg,rgba(55,71,115,.16),rgba(16,19,30,.3))}
+.control-owner-badges h3{display:flex;align-items:center;gap:9px;margin:0 0 8px;font-size:17px}
+.control-owner-badges p{color:var(--muted,#9da3af);font-size:13px}
+.control-owner-badge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-top:15px}
+.control-owner-badge-grid button{display:flex;align-items:flex-start;flex-direction:column;gap:6px;text-align:left;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:15px;background:rgba(255,255,255,.035);color:inherit;cursor:pointer;transition:background .2s,border-color .2s,transform .2s}
+.control-owner-badge-grid button:hover:not(:disabled){background:rgba(255,255,255,.09);transform:translateY(-2px)}
+.control-owner-badge-grid button.active{border-color:rgba(142,207,255,.6);background:rgba(108,164,245,.12)}
+.control-owner-badge-grid button:disabled{opacity:.6;cursor:default}
+.control-owner-badge-grid button>span{font-size:24px;color:white}
+.control-owner-badge-grid button>small{font-size:11px;opacity:.7}
+@media(max-width:480px){.control-owner-badges{padding:14px}.control-owner-badge-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
