@@ -177,10 +177,79 @@ async function adminAuth(req, reply) { const s = await auth(req, reply); if (!s)
     reply.code(403).send({ error: 'Доступ запрещён' });
     return null;
 } return s; }
-app.get('/api/admin/overview', async (req, reply) => { if (!await adminAuth(req, reply))
-    return; const [users, communities, openReports] = await Promise.all([db.user.count(), db.chat.count({ where: { kind: { in: ['group', 'channel'] } } }), db.report.count({ where: { resolvedAt: null } })]); return { users, communities, openReports }; });
-app.get('/api/admin/users', async (req, reply) => { if (!await adminAuth(req, reply))
-    return; const { q } = z.object({ q: z.string().trim().max(50).default('') }).parse(req.query); return { users: await db.user.findMany({ where: q ? { OR: [{ username: { contains: q.toLowerCase().replace(/^@/, '') } }, { name: { contains: q, mode: 'insensitive' } }, ...(/^\d{1,9}$/.test(q) ? [{ id: Number(q) }] : [])] } : {}, select: { id: true, username: true, name: true, createdAt: true, suspended: true, nimbBalance: true }, orderBy: { id: 'desc' }, take: 100 }) }; });
+const adminUserSelect = { id: true, username: true, name: true, createdAt: true, suspended: true, nimbBalance: true, hasAvatar: true, mediaVersion: true };
+app.get('/api/admin/overview', async (req, reply) => {
+    if (!await adminAuth(req, reply))
+        return;
+    const [users, communities, openReports, newUsers, balance, giftCount] = await Promise.all([
+        db.user.count(), db.chat.count({ where: { kind: { in: ['group', 'channel'] } } }),
+        db.report.count({ where: { resolvedAt: null } }),
+        db.user.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 86400000) } } }),
+        db.user.aggregate({ _sum: { nimbBalance: true } }), db.gift.count(),
+    ]);
+    return { users, communities, openReports, newUsers, totalBalance: balance._sum.nimbBalance || 0, gifts: giftCount };
+});
+app.get('/api/admin/users', async (req, reply) => {
+    if (!await adminAuth(req, reply))
+        return;
+    const { q, status, page } = z.object({ q: z.string().trim().max(50).default(''), status: z.enum(['all', 'active', 'suspended']).default('all'), page: z.coerce.number().int().min(1).max(100000).default(1) }).parse(req.query);
+    const where = {
+        ...(q ? { OR: [{ username: { contains: q.toLowerCase().replace(/^@/, '') } }, { name: { contains: q, mode: 'insensitive' } }, ...(/^\d{1,9}$/.test(q) ? [{ id: Number(q) }] : [])] } : {}),
+        ...(status === 'all' ? {} : { suspended: status === 'suspended' }),
+    };
+    const [users, total] = await db.$transaction([
+        db.user.findMany({ where, select: adminUserSelect, orderBy: { id: 'desc' }, skip: (page - 1) * 20, take: 20 }), db.user.count({ where }),
+    ]);
+    return { users: users.map(u => ({ ...u, isAdmin: adminIds.has(u.id) })), total, page, pageSize: 20 };
+});
+app.get('/api/admin/users/:id', async (req, reply) => {
+    if (!await adminAuth(req, reply))
+        return;
+    const id = z.coerce.number().int().positive().parse(req.params.id);
+    const user = await db.user.findUnique({ where: { id }, select: { ...adminUserSelect, purchasedUsernames: { select: { username: true }, orderBy: { id: 'desc' }, take: 50 }, _count: { select: { gifts: true, purchasedUsernames: true } } } });
+    if (!user)
+        return reply.code(404).send({ error: 'Пользователь не найден' });
+    return { user: { ...user, isAdmin: adminIds.has(user.id) } };
+});
+app.get('/api/admin/activity', async (req, reply) => {
+    if (!await adminAuth(req, reply))
+        return;
+    const { userId } = z.object({ userId: z.coerce.number().int().positive().optional() }).parse(req.query);
+    const who = { id: true, username: true, name: true };
+    const [currency, presents, names] = await Promise.all([
+        db.currencyGrant.findMany({ where: userId ? { recipientId: userId } : {}, orderBy: { id: 'desc' }, take: 50, include: { recipient: { select: who }, admin: { select: who } } }),
+        db.giftEvent.findMany({ where: userId ? { gift: { ownerId: userId } } : {}, orderBy: { id: 'desc' }, take: 50, include: { sender: { select: who }, gift: { select: { template: true, owner: { select: who } } } } }),
+        db.usernamePurchase.findMany({ where: userId ? { ownerId: userId } : {}, orderBy: { id: 'desc' }, take: 50, include: { owner: { select: who }, grantedBy: { select: who } } }),
+    ]);
+    const events = [
+        ...currency.map(e => ({ id: 'currency-' + e.id, kind: 'currency', createdAt: e.createdAt, user: e.recipient, actor: e.admin, label: 'Начисление нимбиков', value: '+' + e.amount.toLocaleString('ru-RU') })),
+        ...presents.map(e => ({ id: 'gift-' + e.id, kind: 'gift', createdAt: e.createdAt, user: e.gift.owner, actor: e.sender, label: 'Подарок', value: gifts[e.gift.template]?.name || e.gift.template })),
+        ...names.map(e => ({ id: 'username-' + e.id, kind: 'username', createdAt: e.purchasedAt, user: e.owner, actor: e.grantedBy, label: e.price === 0 ? 'Выдача юзернейма' : 'Покупка юзернейма', value: '@' + e.username })),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id)).slice(0, 50);
+    return { events };
+});
+app.post('/api/admin/users/:id/username', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const actor = await adminAuth(req, reply);
+    if (!actor)
+        return;
+    const id = z.coerce.number().int().positive().parse(req.params.id);
+    const { username } = z.object({ username: z.string().regex(/^[1-9][0-9]{0,5}$/) }).parse(req.body);
+    const result = await db.$transaction(async (tx) => {
+        await tx.$executeRaw `SELECT pg_advisory_xact_lock(${id})`;
+        if (!await tx.user.findUnique({ where: { id }, select: { id: true } }))
+            return 'missing';
+        if (await tx.usernamePurchase.findUnique({ where: { username } }) || await tx.user.findUnique({ where: { username }, select: { id: true } }))
+            return 'taken';
+        await tx.usernamePurchase.create({ data: { username, price: 0, ownerId: id, grantedById: actor.userId } });
+        return 'ok';
+    });
+    if (result === 'missing')
+        return reply.code(404).send({ error: 'Пользователь не найден' });
+    if (result === 'taken')
+        return reply.code(409).send({ error: 'Этот юзернейм уже занят' });
+    io.to(`user:${id}`).emit('wallet:update');
+    return { ok: true, username };
+});
 app.post('/api/admin/users/:id/currency', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const { amount } = z.object({ amount: z.number().int().min(1).max(1000000) }).parse(req.body); const result = await db.$transaction(async (tx) => { const updated = await tx.user.updateMany({ where: { id, nimbBalance: { lte: 2147483647 - amount } }, data: { nimbBalance: { increment: amount } } }); if (!updated.count)
     return null; await tx.currencyGrant.create({ data: { adminId: actor.userId, recipientId: id, amount } }); return tx.user.findUniqueOrThrow({ where: { id }, select: { nimbBalance: true } }); }); if (!result)
@@ -188,8 +257,12 @@ app.post('/api/admin/users/:id/currency', { config: { rateLimit: { max: 30, time
 app.post('/api/admin/users/:id/gifts', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const { template } = z.object({ template: z.enum(['star', 'heart', 'flower', 'comet', 'moon', 'diamond']) }).parse(req.body); if (!await db.user.findUnique({ where: { id }, select: { id: true } }))
     return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.gift.create({ data: { ownerId: id, template, events: { create: { senderId: actor.userId } } } }); io.to(`user:${id}`).emit('gift:new', { userId: id }); return { gift: { id: gift.id } }; });
-app.get('/api/admin/reports', async (req, reply) => { if (!await adminAuth(req, reply))
-    return; return { reports: await db.report.findMany({ where: { resolvedAt: null }, select: { id: true, reason: true, createdAt: true, reporter: { select: { id: true, username: true, name: true } }, reported: { select: { id: true, username: true, name: true, suspended: true } } }, orderBy: { id: 'desc' }, take: 100 }) }; });
+app.get('/api/admin/reports', async (req, reply) => {
+    if (!await adminAuth(req, reply))
+        return;
+    const reports = await db.report.findMany({ where: { resolvedAt: null }, select: { id: true, reason: true, createdAt: true, reporter: { select: { id: true, username: true, name: true } }, reported: { select: { id: true, username: true, name: true, suspended: true } } }, orderBy: { id: 'desc' }, take: 100 });
+    return { reports: reports.map(r => ({ ...r, reported: { ...r.reported, isAdmin: adminIds.has(r.reported.id) } })) };
+});
 app.post('/api/admin/reports/:id/resolve', async (req, reply) => { if (!await adminAuth(req, reply))
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const result = await db.report.updateMany({ where: { id, resolvedAt: null }, data: { resolvedAt: new Date() } }); if (!result.count)
     return reply.code(404).send({ error: 'Жалоба не найдена' }); return { ok: true }; });

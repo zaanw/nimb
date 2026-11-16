@@ -73,7 +73,7 @@ export function Dialog({
       }
       if (e.key === "Tab") {
         const focusable = node?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),input:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
+          'button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
         );
         if (!focusable?.length) return;
         const first = focusable[0],

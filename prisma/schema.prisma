@@ -40,6 +40,7 @@ model User {
   currencyReceived CurrencyGrant[] @relation("CurrencyRecipient")
   currencyGranted CurrencyGrant[] @relation("CurrencyAdmin")
   purchasedUsernames UsernamePurchase[]
+  usernameGrants UsernamePurchase[] @relation("UsernameGrantAdmin")
   suspended Boolean @default(false)
   authTokens AuthToken[]
   createdAt DateTime @default(now())
@@ -232,6 +233,8 @@ model UsernamePurchase {
   username String @unique
   ownerId Int
   price Int
+  grantedById Int?
+  grantedBy User? @relation("UsernameGrantAdmin", fields:[grantedById], references:[id], onDelete:SetNull)
   purchasedAt DateTime @default(now())
   owner User @relation(fields:[ownerId], references:[id], onDelete:Cascade)
   @@index([ownerId])
