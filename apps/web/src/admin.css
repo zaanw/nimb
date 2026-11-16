@@ -1,9 +1,9 @@
-/* Nimb control room. Scoped so the messenger keeps its own visual rhythm. */
+/* Midnight glass, champagne light and a custom orbital Nimb emblem. */
 .admin-console {
   --control-gold: #e8c589;
-  --control-ink: #eeede9;
-  --control-muted: #93939d;
-  --control-border: #ffffff12;
+  --control-ink: #f4f1eb;
+  --control-muted: #a1adb8;
+  --control-border: #b0c5dc20;
   max-width: 1420px;
   margin: 0 auto;
   width: 100%;
@@ -18,7 +18,20 @@
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  margin-bottom: 29px;
+  margin-bottom: 24px;
+  padding: 32px;
+  min-height: 196px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid #a6bbc62e;
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 76% 5%, #65839a22, transparent 62%),
+    linear-gradient(120deg, #26343e, #1b2832 52%, #14212a);
+  box-shadow:
+    inset 0 1px 0 #ffffff09,
+    0 14px 36px #00000018;
 }
 .control-breadcrumb {
   display: flex;
@@ -36,7 +49,7 @@
   color: #4c4c56;
 }
 .control-heading h1 {
-  font-size: 34px;
+  font-size: 40px;
   line-height: 1.2;
   letter-spacing: -1.2px;
   font-weight: 600;
@@ -93,8 +106,11 @@
   min-width: 0;
   padding: 21px 22px;
   border: 1px solid var(--control-border);
-  background: #19191c;
-  border-radius: 12px;
+  background: linear-gradient(145deg, #283340c9, #1b232ecc);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 #ffffff05,
+    0 7px 20px #0000000d;
   text-align: left;
   position: relative;
 }
@@ -103,15 +119,17 @@
   background: #1e1e22;
 }
 .control-metrics > .gold-metric {
-  background: #24211c;
-  border-color: #d9b77b24;
+  background:
+    radial-gradient(ellipse at 100% 0%, #bca36920, transparent 75%),
+    linear-gradient(135deg, #3e392d, #292a29);
+  border-color: #e8c58940;
 }
 .control-metrics > * > span {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #aaaab2;
-  font-size: 11px;
+  color: #b3bdc7;
+  font-size: 12px;
 }
 .control-metrics > * > span > svg:last-child:not(:first-child) {
   margin-left: auto;
@@ -140,7 +158,7 @@
   display: block;
   font-size: 10px;
   line-height: 1.5;
-  color: #85858f;
+  color: #9ba5b0;
 }
 .control-shortcuts {
   display: grid;
@@ -153,9 +171,12 @@
   align-items: center;
   gap: 14px;
   padding: 18px;
-  background: #18181b;
+  background: linear-gradient(130deg, #26303dcd, #1b242ec9);
   border: 1px solid var(--control-border);
-  border-radius: 11px;
+  border-radius: 17px;
+  box-shadow:
+    inset 0 1px 0 #ffffff05,
+    0 6px 20px #00000010;
   text-align: left;
   min-width: 0;
 }
@@ -188,22 +209,34 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #ffffff06;
   color: #bcbcc8;
   flex-shrink: 0;
 }
 .control-symbol.currency {
   color: #e8c589;
-  background: #e8c58912;
+  background: linear-gradient(145deg, #9a82573b, #e8c58910);
+  border: 1px solid #e8c5892b;
+  box-shadow:
+    inset 0 1px 0 #ffe2a81c,
+    0 3px 7px #00000012;
 }
 .control-symbol.gift {
   color: #d6a9c1;
-  background: #d6a9c111;
+  background: linear-gradient(145deg, #ac7a9838, #d6a9c10b);
+  border: 1px solid #d6a9c12b;
+  box-shadow:
+    inset 0 1px 0 #f8c6e51c,
+    0 3px 7px #00000012;
 }
 .control-symbol.username {
   color: #b7bbdf;
-  background: #b7bbdf11;
+  background: linear-gradient(145deg, #7c8eab40, #b7bbdf10);
+  border: 1px solid #b7bbdf2b;
+  box-shadow:
+    inset 0 1px 0 #dee8ff1c,
+    0 3px 7px #00000012;
 }
 .control-tabs {
   display: flex;
@@ -261,9 +294,12 @@
   min-width: 0;
 }
 .control-panel {
-  background: #18181b;
+  background: linear-gradient(145deg, #202a36eb, #19222cec);
   border: 1px solid var(--control-border);
-  border-radius: 13px;
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1px 0 #ffffff07,
+    0 14px 36px #03071026;
   min-width: 0;
   overflow: hidden;
 }
@@ -282,12 +318,12 @@
 }
 .control-panel-heading p {
   margin: 5px 0 0;
-  color: #8c8c97;
+  color: #9aa8b7;
   font-size: 11px;
   line-height: 1.5;
 }
 .control-panel-heading > svg {
-  color: #8c8c97;
+  color: #9aa8b7;
 }
 .control-toolbar {
   display: flex;
@@ -303,7 +339,7 @@
   flex: 1;
   border: 1px solid #ffffff14;
   border-radius: 8px;
-  background: #131315;
+  background: #0f17257d;
   margin: 0;
 }
 .control-search > svg {
@@ -342,7 +378,7 @@
   font-size: 11px;
   border: 1px solid #ffffff14;
   border-radius: 8px;
-  background: #202024;
+  background: #25303c;
 }
 .control-table-labels,
 .control-user-row {
@@ -369,7 +405,7 @@
   position: relative;
 }
 .control-user-row.selected {
-  background: #e8c58904;
+  background: linear-gradient(90deg, #e8c5890c, #e8c58902);
 }
 .control-user-row.selected::before {
   content: "";
@@ -406,8 +442,11 @@
   flex-shrink: 0;
   font-size: 16px;
   font-weight: 500;
-  background: #2b2b30;
-  color: #d9d9df;
+  background: linear-gradient(145deg, #526674, #2b3b49);
+  color: #e4edf2;
+  box-shadow:
+    inset 0 1px 0 #ffffff19,
+    0 4px 9px #07101a22;
   overflow: hidden;
   border: 1px solid #ffffff07;
 }
@@ -431,7 +470,7 @@
 .control-user-info small {
   display: block;
   margin: 4px 0;
-  color: #8b8b97;
+  color: #9aa8b7;
   font-size: 10px;
   overflow-wrap: anywhere;
 }
@@ -472,7 +511,7 @@
 }
 .control-user-balance small {
   display: block;
-  color: #74747f;
+  color: #96a2b0;
   font-size: 9px;
   margin-top: 5px;
 }
@@ -560,7 +599,7 @@
 .control-operation-person span {
   font-size: 10px;
   display: block;
-  color: #80808c;
+  color: #9ca8b6;
   margin-top: 5px;
   overflow-wrap: anywhere;
 }
@@ -595,7 +634,7 @@
   margin: 0 20px;
   padding: 19px 0 17px;
   border-bottom: 1px solid #ffffff09;
-  color: #7d7d89;
+  color: #9ca8b6;
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.09em;
@@ -612,7 +651,11 @@
   height: 62px;
   border-radius: 20px;
   font-size: 24px;
-  background: #323033;
+  background: linear-gradient(140deg, #657178, #3e4c57 52%, #26333f);
+  box-shadow:
+    0 0 0 6px #ffffff03,
+    0 8px 22px #00000020,
+    inset 0 1px 0 #e1d6bc44;
 }
 .control-person h2 {
   font-size: 18px;
@@ -641,9 +684,11 @@
 .control-person-balance {
   margin: 0 20px 14px;
   padding: 16px;
-  border: 1px solid #c5a56b25;
+  border: 1px solid #c5a56b40;
   border-radius: 10px;
-  background: #24211c;
+  background:
+    radial-gradient(ellipse at 90% 10%, #cfb07214, transparent 70%),
+    linear-gradient(135deg, #3b382e, #292c2d);
 }
 .control-person-balance > span {
   display: flex;
@@ -718,7 +763,7 @@
   padding: 7px 0;
 }
 .control-person-meta dt {
-  color: #80808c;
+  color: #9ca8b6;
 }
 .control-person-meta dd {
   color: #bfbfc8;
@@ -882,7 +927,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 18px;
-  background: #121214;
+  background: #111b27;
   border: 1px solid #ffffff08;
   border-radius: 9px;
   font-size: 13px;
@@ -1016,7 +1061,7 @@
   gap: 13px;
   margin-top: 10px;
   padding: 0 16px;
-  background: #121214;
+  background: #111b27;
   border: 1px solid #ffffff20;
   border-radius: 10px;
   color: #e8c589;
@@ -1246,11 +1291,14 @@
 }
 @media (max-width: 760px) {
   .control-heading {
-    margin-bottom: 22px;
-    gap: 15px;
+    margin-bottom: 18px;
+    gap: 12px;
+    padding: 22px 18px;
+    min-height: 164px;
+    border-radius: 20px;
   }
   .control-heading h1 {
-    font-size: 27px;
+    font-size: 29px;
     letter-spacing: -0.8px;
   }
   .control-heading p {
@@ -1278,14 +1326,14 @@
   .control-metrics > div,
   .control-metrics > button {
     padding: 15px;
-    border-radius: 10px;
+    border-radius: 16px;
   }
   .control-metrics strong {
     font-size: 28px;
     margin: 14px 0 7px;
   }
   .control-metrics small {
-    font-size: 8px;
+    font-size: 9px;
   }
   .control-metrics > * > span {
     gap: 7px;
@@ -1306,7 +1354,7 @@
     border-radius: 9px;
   }
   .control-shortcuts strong {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.5;
   }
   .control-shortcuts small {
@@ -1329,7 +1377,7 @@
     padding: 1px 4px;
   }
   .control-panel {
-    border-radius: 11px;
+    border-radius: 17px;
   }
   .control-panel-heading {
     padding: 17px 16px;
@@ -1394,8 +1442,8 @@
   .control-row-actions button {
     width: auto;
     flex: 1;
-    font-size: 9px;
-    height: 32px;
+    font-size: 10px;
+    height: 38px;
     padding: 0 5px;
   }
   .control-row-actions button > span {
@@ -1495,5 +1543,169 @@
 @media (prefers-reduced-motion: reduce) {
   .control-spin {
     animation: none;
+  }
+}
+
+.control-heading-art {
+  position: absolute;
+  inset: -20px 8% -24px auto;
+  width: 360px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.9;
+}
+.control-heading-art svg {
+  width: 100%;
+  height: 100%;
+}
+.control-heading-copy {
+  position: relative;
+  z-index: 1;
+}
+.control-heading > .control-button {
+  align-self: flex-start;
+  background: #121d2780;
+  border-color: #b9ced124;
+  backdrop-filter: blur(8px);
+}
+.control-inspector {
+  position: relative;
+  background:
+    radial-gradient(ellipse at 50% 0, #60869a22, transparent 45%),
+    linear-gradient(155deg, #26313ded, #1c252fec);
+}
+.control-tabs {
+  border-color: #b2c7d528;
+}
+.control-tabs button.active {
+  text-shadow: 0 0 15px #e8c58928;
+}
+.control-tabs button.active::after {
+  height: 3px;
+  border-radius: 3px;
+  box-shadow: 0 0 12px #e8c58940;
+}
+.confirm-dialog:has(.control-grant-dialog) {
+  background:
+    radial-gradient(ellipse at 100% 0, #45677e25, transparent 60%), #202a35;
+  border-color: #b9cad52b;
+  box-shadow:
+    0 30px 100px #030812a0,
+    inset 0 1px 0 #ffffff09;
+}
+.control-recipient,
+.control-recipient-picker,
+.control-gift {
+  background: #131f2b;
+  border-color: #b4c9dc19;
+}
+.control-gift.selected {
+  background: linear-gradient(145deg, #6a5b343d, #342f291a);
+}
+.control-review {
+  background: #111d29;
+  border-color: #b4c9dc19;
+}
+.control-button.solid {
+  background: linear-gradient(115deg, #f2d7ac, #d6b37d);
+  box-shadow:
+    inset 0 1px 0 #ffffff52,
+    0 4px 15px #e8c5890d;
+}
+@media (max-width: 1100px) {
+  .control-heading-art {
+    right: 6%;
+    opacity: 0.48;
+    width: 300px;
+  }
+}
+@media (max-width: 760px) {
+  .control-heading-art {
+    right: -85px;
+    top: -22px;
+    bottom: -25px;
+    width: 250px;
+    opacity: 0.3;
+  }
+  .control-heading-copy {
+    max-width: calc(100% - 32px);
+  }
+  .control-heading h1 {
+    white-space: nowrap;
+    font-size: clamp(23px, 6.8vw, 29px);
+  }
+  .control-heading > button {
+    position: absolute;
+    right: 14px;
+    top: 17px;
+    width: 31px;
+    height: 31px;
+    min-height: 31px;
+    border-radius: 10px;
+  }
+  .control-heading p {
+    max-width: 205px;
+    line-height: 1.65;
+  }
+  .control-shortcuts > button {
+    border-radius: 15px;
+    padding: 15px 10px;
+    min-height: 109px;
+  }
+  .control-symbol {
+    border-radius: 12px;
+  }
+}
+
+/* Static SVG lighting is cheap to render on phones and never obstructs input. */
+.shell:has(.admin-console) {
+  background-color: #101923;
+  background-image: url("/admin-atmosphere.svg");
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.shell:has(.admin-console) > .sidebar {
+  background: linear-gradient(180deg, #18222de8, #121c27f5);
+  border-color: #b2c7dc16;
+}
+.shell:has(.admin-console) .sidebar button.active {
+  background: linear-gradient(100deg, #e8c58915, #e8c58905);
+  border-color: #e8c58924;
+}
+.shell:has(.admin-console) .sidebar button.active::before {
+  background: #e8c589;
+}
+.shell:has(.admin-console) .mobile-nav {
+  background: #172331ee;
+  border-color: #b2c7dc24;
+  box-shadow:
+    0 -8px 35px #050b1726,
+    inset 0 1px 0 #ffffff06;
+  backdrop-filter: blur(18px);
+}
+.shell:has(.admin-console) .mobile-nav button.active {
+  background: #d3b88d14;
+  color: #f1d4a8;
+}
+@media (min-width: 1101px) and (prefers-reduced-motion: no-preference) {
+  .control-heading-art {
+    animation: admin-light 14s ease-in-out infinite alternate;
+  }
+  @keyframes admin-light {
+    from {
+      opacity: 0.68;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-4px);
+    }
+  }
+}
+@media (max-width: 760px) {
+  .shell:has(.admin-console) {
+    background-size: 1250px auto;
+    background-position: 45% top;
   }
 }

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1400" viewBox="0 0 1800 1400" fill="none">
+  <defs>
+    <radialGradient id="cool"><stop stop-color="#4c7894" stop-opacity=".34"/><stop offset="1" stop-color="#4c7894" stop-opacity="0"/></radialGradient>
+    <radialGradient id="warm"><stop stop-color="#aa8253" stop-opacity=".22"/><stop offset="1" stop-color="#aa8253" stop-opacity="0"/></radialGradient>
+    <radialGradient id="lower"><stop stop-color="#356677" stop-opacity=".18"/><stop offset="1" stop-color="#356677" stop-opacity="0"/></radialGradient>
+    <linearGradient id="line" x1="650" y1="0" x2="1680" y2="900" gradientUnits="userSpaceOnUse"><stop stop-color="#b6ced8" stop-opacity="0"/><stop offset=".5" stop-color="#9eabb5" stop-opacity=".11"/><stop offset="1" stop-color="#e8c589" stop-opacity="0"/></linearGradient>
+  </defs>
+  <ellipse cx="590" cy="150" rx="830" ry="610" fill="url(#cool)"/>
+  <ellipse cx="1630" cy="190" rx="750" ry="630" fill="url(#warm)"/>
+  <ellipse cx="1320" cy="1110" rx="900" ry="690" fill="url(#lower)"/>
+  <g stroke="url(#line)" stroke-width="1">
+    <path d="M840 -170C1420 -20 1120 240 1580 430S2010 880 1670 1120"/>
+    <path d="M800 -150C1380 0 1080 260 1540 450S1970 900 1630 1140"/>
+    <path d="M760 -130C1340 20 1040 280 1500 470S1930 920 1590 1160"/>
+    <path d="M720 -110C1300 40 1000 300 1460 490S1890 940 1550 1180"/>
+    <path d="M680 -90C1260 60 960 320 1420 510S1850 960 1510 1200"/>
+    <path d="M640 -70C1220 80 920 340 1380 530S1810 980 1470 1220"/>
+  </g>
+</svg>
