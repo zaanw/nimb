@@ -254,11 +254,17 @@ test("a delayed send cannot clear a draft in another conversation", async ({
       }),
     });
   });
-  await page.locator(".chat-list-item").first().click();
+  await page
+    .locator(".chat-list-item")
+    .filter({ has: page.getByText("Собеседник", { exact: true }) })
+    .click();
   await page.getByLabel("Сообщение", { exact: true }).fill("Первое сообщение");
   await page.getByRole("button", { name: "Отправить", exact: true }).click();
   await expect.poll(() => !!complete).toBe(true);
-  await page.locator(".chat-list-item").nth(1).click();
+  await page
+    .locator(".chat-list-item")
+    .filter({ hasText: "Другой собеседник" })
+    .click();
   await page
     .getByLabel("Сообщение", { exact: true })
     .fill("Черновик другого чата");
@@ -272,9 +278,15 @@ test("a delayed send cannot clear a draft in another conversation", async ({
   await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue(
     "Черновик другого чата",
   );
-  await page.locator(".chat-list-item").first().click();
+  await page
+    .locator(".chat-list-item")
+    .filter({ has: page.getByText("Собеседник", { exact: true }) })
+    .click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue("");
-  await page.locator(".chat-list-item").nth(1).click();
+  await page
+    .locator(".chat-list-item")
+    .filter({ hasText: "Другой собеседник" })
+    .click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue(
     "Черновик другого чата",
   );
@@ -332,4 +344,25 @@ test("stored navigation is scoped to the account and cannot expose admin", async
   await expect(
     page.getByRole("heading", { name: "Сообщения", exact: true }),
   ).toBeVisible();
+});
+
+test("drafts survive a reload and remain separate between conversations", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, true, true);
+  await page.locator(".chat-list-item").first().click();
+  await page
+    .getByLabel("Сообщение", { exact: true })
+    .fill("Незаконченная мысль");
+  await page.reload();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue(
+    "Незаконченная мысль",
+  );
+  await page.getByRole("button", { name: "Назад", exact: true }).click();
+  await expect(page.locator(".chat-list-item").first()).toContainText(
+    "Черновик: Незаконченная мысль",
+  );
+  await page.locator(".chat-list-item").nth(1).click();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue("");
 });

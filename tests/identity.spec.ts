@@ -172,12 +172,12 @@ test("ordinary accounts see the shared design but cannot edit Plus appearance", 
     .click();
   await page.getByRole("button", { name: "nimb Plus", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Чуть больше вас" }),
+    page.getByRole("heading", { name: "Plus не подключён" }),
   ).toBeVisible();
   await expect(page.getByLabel("Шрифт имени")).toHaveCount(0);
   expect(
     await page
       .locator(".shell")
       .evaluate((el) => getComputedStyle(el).backgroundImage),
-  ).toContain("nimb-atmosphere.svg");
+  ).toBe("none");
 });

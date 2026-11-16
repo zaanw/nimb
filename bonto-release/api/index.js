@@ -1,3 +1,4 @@
+import { registerMessenger } from './messenger.js';
 import { identitySelect, collectibleName, collectiblePrice, lockName, registerIdentity } from './identity.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: new URL('../../../.env', import.meta.url).pathname });
@@ -88,6 +89,9 @@ app.addHook('preSerialization', async (req, _reply, payload) => { const redact =
     for (const item of value)
         redact(item);
     return;
+} if ('chatPinned' in value && value.userId !== req.viewerId) {
+    delete value.chatPinned;
+    delete value.archived;
 } if (typeof value.username === 'string' && typeof value.bioPrivate === 'boolean') {
     if (value.bioPrivate && value.id !== req.viewerId)
         value.bio = '';
@@ -428,7 +432,7 @@ app.get('/api/users/:id/music', async (req, reply) => { const s = await auth(req
     reply.header('Content-Length', obj.ContentLength); return reply.send(obj.Body); });
 app.get('/api/users', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const { q } = z.object({ q: z.string().trim().min(1).max(50) }).parse(req.query); const term = q.startsWith('@') ? q.slice(1).trim() : q; if (!term)
-    return { users: [] }; return { users: await db.user.findMany({ where: { id: { not: s.userId }, OR: [{ username: { contains: term.toLowerCase() } }, { collectibleNumber: { contains: term } }, { name: { contains: term, mode: 'insensitive' } }] }, select: publicUser, take: 20 }) }; });
+    return { users: [] }; return { users: await db.user.findMany({ where: { id: { not: s.userId }, OR: [{ username: { contains: term.toLowerCase() } }, { purchasedUsernames: { some: { public: true, username: { contains: term.toLowerCase() } } } }, { collectibleNumber: { contains: term } }, { name: { contains: term, mode: 'insensitive' } }] }, select: publicUser, take: 20 }) }; });
 app.get('/api/users/:id', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const user = await db.user.findUnique({ where: { id }, select: publicUser }); if (!user)
     return reply.code(404).send({ error: 'Пользователь не найден' }); return { user }; });
@@ -442,7 +446,7 @@ app.get('/api/chats', async (req, reply) => { const s = await auth(req, reply); 
 async function member(chatId, userId) { return db.member.findUnique({ where: { chatId_userId: { chatId, userId } } }); }
 app.get('/api/chats/:id/messages', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); if (!await member(id, s.userId))
-    return reply.code(404).send({ error: 'Чат не найден' }); const { q, before } = z.object({ q: z.string().trim().max(100).optional(), before: z.coerce.number().int().positive().optional() }).parse(req.query); const rows = await db.message.findMany({ where: { chatId: id, ...(before ? { id: { lt: before } } : {}), ...(q ? { text: { contains: q, mode: 'insensitive' } } : {}) }, include: { replyTo: { select: { id: true, text: true, senderId: true } }, reactions: true, attachment: { select: { id: true, name: true, mime: true, size: true } } }, orderBy: { id: 'desc' }, take: 51 }); const hasMore = rows.length > 50; const messages = rows.slice(0, 50); const chat = await db.chat.findUnique({ where: { id }, select: { kind: true } }); const blockedDirect = chat?.kind === 'direct' && await isDirectBlocked(id, s.userId); let deliveryCounts = new Map(); if (chat?.kind === 'direct' && !blockedDirect && messages.length) {
+    return reply.code(404).send({ error: 'Чат не найден' }); const { q, before } = z.object({ q: z.string().trim().max(100).optional(), before: z.coerce.number().int().positive().optional() }).parse(req.query); const rows = await db.message.findMany({ where: { chatId: id, ...(before ? { id: { lt: before } } : {}), ...(q ? { text: { contains: q, mode: 'insensitive' } } : {}) }, include: { savedBy: { where: { userId: s.userId }, select: { id: true } }, replyTo: { select: { id: true, text: true, senderId: true } }, reactions: true, attachment: { select: { id: true, name: true, mime: true, size: true } } }, orderBy: { id: 'desc' }, take: 51 }); const hasMore = rows.length > 50; const messages = rows.slice(0, 50); const chat = await db.chat.findUnique({ where: { id }, select: { kind: true } }); const blockedDirect = chat?.kind === 'direct' && await isDirectBlocked(id, s.userId); let deliveryCounts = new Map(); if (chat?.kind === 'direct' && !blockedDirect && messages.length) {
     const received = messages.filter(m => m.senderId !== s.userId);
     if (received.length) {
         const inserted = await db.messageDelivery.createMany({ data: received.map(m => ({ messageId: m.id, userId: s.userId })), skipDuplicates: true });
@@ -466,7 +470,7 @@ app.get('/api/chats/:id/messages', async (req, reply) => { const s = await auth(
     const changed = await db.member.updateMany({ where: { chatId: id, userId: s.userId, lastReadId: { lt: messages[0].id } }, data: { lastReadId: messages[0].id } });
     if (changed.count)
         await notifyChat(id, 'read', { chatId: id, userId: s.userId, lastReadId: messages[0].id });
-} messages.reverse(); return { messages: messages.map(message => ({ ...message, viewCount: counts.get(message.id) || 0, delivered: (deliveryCounts.get(message.id) || 0) > 0 })), nextCursor: hasMore ? messages[0].id : null }; });
+} messages.reverse(); return { messages: messages.map(({ savedBy, ...message }) => ({ ...message, saved: savedBy.length > 0, viewCount: counts.get(message.id) || 0, delivered: (deliveryCounts.get(message.id) || 0) > 0 })), nextCursor: hasMore ? messages[0].id : null }; });
 app.post('/api/chats/:id/messages', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const { text, replyToId } = z.object({ text: z.string().trim().min(1).max(4000), replyToId: z.number().int().positive().optional() }).parse(req.body); if (!await member(id, s.userId))
     return reply.code(404).send({ error: 'Чат не найден' }); const chat = await db.chat.findUnique({ where: { id } }); const membership = await member(id, s.userId); if (chat?.kind === 'channel' && !['owner', 'admin'].includes(membership.role))
@@ -584,8 +588,33 @@ app.delete('/api/messages/:id', async (req, reply) => { const s = await auth(req
         app.log.error(err);
     } await notifyChat(m.chatId, 'message:delete', { id, chatId: m.chatId }); return { ok: true }; });
 registerIdentity(app, db, auth, announceProfile);
+registerMessenger(app, db, auth, id => io.to(`user:${id}`).emit('personal:update'));
 app.get('/api/wallet', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const [user, owned] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { nimbBalance: true, username: true, collectibleNumber: true } }), db.usernamePurchase.findMany({ where: { ownerId: s.userId }, orderBy: { id: 'desc' }, select: { username: true, price: true, purchasedAt: true } })]); return { balance: user.nimbBalance, username: user.username, collectibleNumber: user.collectibleNumber, owned }; });
+    return; const [user, owned] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { nimbBalance: true, username: true, collectibleNumber: true } }), db.usernamePurchase.findMany({ where: { ownerId: s.userId }, orderBy: { id: 'desc' }, select: { username: true, price: true, purchasedAt: true, public: true } })]); return { balance: user.nimbBalance, username: user.username, collectibleNumber: user.collectibleNumber, owned }; });
+app.patch('/api/wallet/visibility', async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const { username, visible } = z.object({ username: collectibleName, visible: z.boolean() }).parse(req.body);
+    const changed = await db.usernamePurchase.updateMany({ where: { username, ownerId: s.userId }, data: { public: visible } });
+    if (!changed.count)
+        return reply.code(404).send({ error: 'Имя или номер не принадлежат вам' });
+    io.to(`user:${s.userId}`).emit('wallet:update');
+    await announceProfile(s.userId);
+    return { ok: true };
+});
+app.get('/api/users/:id/identifiers', async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const id = z.coerce.number().int().positive().parse(req.params.id);
+    if (await blocked(s.userId, id))
+        return reply.code(404).send({ error: 'Пользователь не найден' });
+    const user = await db.user.findUnique({ where: { id }, select: { username: true, collectibleNumber: true, purchasedUsernames: { where: { public: true }, select: { username: true }, orderBy: { id: 'asc' } } } });
+    if (!user)
+        return reply.code(404).send({ error: 'Пользователь не найден' });
+    return { names: [...new Set([user.username, ...user.purchasedUsernames.filter(n => !n.username.startsWith('+')).map(n => n.username)])], numbers: [...new Set([...(user.collectibleNumber ? [user.collectibleNumber] : []), ...user.purchasedUsernames.filter(n => n.username.startsWith('+')).map(n => n.username)])] };
+});
 app.get('/api/wallet/check', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const { username } = z.object({ username: collectibleName }).parse(req.query); const [used, purchase] = await Promise.all([db.user.findUnique({ where: { username }, select: { id: true } }), db.usernamePurchase.findUnique({ where: { username }, select: { ownerId: true } })]); return { username, price: collectiblePrice(username), available: !used && !purchase, owned: purchase?.ownerId === s.userId }; });
 app.post('/api/wallet/buy', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {

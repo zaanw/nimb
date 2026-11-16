@@ -196,7 +196,7 @@ export function Feed({
       <PageHeading
         eyebrow="СООБЩЕСТВО"
         title="Лента"
-        description="Мысли, моменты и люди рядом."
+        description=""
         action={
           <button
             className="outline compact-button"
@@ -445,8 +445,8 @@ export function Feed({
             <div className="context-wallet-icon">
               <Wallet size={18} />
             </div>
-            <h2>Имя, которое запомнят</h2>
-            <p>Выберите числовой юзернейм и добавьте его в свою коллекцию.</p>
+            <h2>Юзернеймы и номера</h2>
+            <p>Купленные имена и номера хранятся в кошельке.</p>
             <button
               className="text-action"
               onClick={() => onNavigate("wallet")}
@@ -455,14 +455,14 @@ export function Feed({
             </button>
           </section>
           <section className="context-card">
-            <h2>Найдите своих</h2>
+            <h2>Поиск пользователей</h2>
             <p>Ищите людей по @юзернейму и подписывайтесь на их публикации.</p>
             <button className="text-action" onClick={() => onNavigate("chats")}>
               Перейти к общению <ArrowUpRight size={14} />
             </button>
           </section>
           <div className="context-footer">
-            <Brand markOnly /> nimb · место для своих
+            <Brand markOnly /> nimb
           </div>
         </aside>
       </div>

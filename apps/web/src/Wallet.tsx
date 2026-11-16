@@ -13,7 +13,12 @@ type WalletData = {
   balance: number;
   username: string;
   collectibleNumber?: string | null;
-  owned: { username: string; price: number; purchasedAt: string }[];
+  owned: {
+    username: string;
+    price: number;
+    purchasedAt: string;
+    public?: boolean;
+  }[];
 };
 type CheckResult = {
   username: string;
@@ -70,6 +75,28 @@ export function Wallet({ onBack }: { onBack: () => void }) {
       ]);
     },
   });
+  const visibility = useMutation({
+    mutationFn: async ({
+      username,
+      visible,
+    }: {
+      username: string;
+      visible: boolean;
+    }) => {
+      const response = await fetch("/api/wallet/visibility", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, visible }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не удалось сохранить");
+      return data;
+    },
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: ["wallet"] }),qc.invalidateQueries({ queryKey: ["identifiers"] })]);
+    },
+  });
   function checkName(e: React.FormEvent) {
     e.preventDefault();
     setChecked(null);
@@ -108,7 +135,7 @@ export function Wallet({ onBack }: { onBack: () => void }) {
       <PageHeading
         eyebrow="ВАШЕ ПРОСТРАНСТВО"
         title="Кошелёк"
-        description="Нимбики, юзернеймы и немного индивидуальности."
+        description="Баланс, имена и номера nimb."
         action={
           <button
             className="icon-button"
@@ -155,6 +182,11 @@ export function Wallet({ onBack }: { onBack: () => void }) {
               и коллекционных номеров.
             </span>
           </div>
+          {visibility.isError && (
+            <p className="error" role="alert">
+              {visibility.error.message}
+            </p>
+          )}
           <section className="wallet-card">
             <div className="wallet-card-heading">
               <Hash size={18} />
@@ -169,52 +201,81 @@ export function Wallet({ onBack }: { onBack: () => void }) {
               <p>Коллекция временно недоступна.</p>
             ) : wallet.data?.owned.length ? (
               wallet.data.owned.map((item) => (
-                <div className="wallet-owned" key={item.username}>
-                  <span className="wallet-owned-icon">
-                    <AtSign size={17} />
-                  </span>
-                  <span>
-                    <strong>{labelName(item.username)}</strong>
-                    <small>
-                      В коллекции с{" "}
-                      {new Date(item.purchasedAt).toLocaleDateString("ru-RU")}
-                    </small>
-                  </span>
-                  {wallet.data?.username === item.username ||
-                  wallet.data?.collectibleNumber === item.username ? (
-                    <span className="status-pill">
-                      <Check size={11} /> Активен
+                <div className="wallet-ownership-item" key={item.username}>
+                  <div className="wallet-owned">
+                    <span className="wallet-owned-icon">
+                      <AtSign size={17} />
                     </span>
-                  ) : (
-                    <button
-                      className="outline"
-                      disabled={action.isPending}
-                      onClick={async () => {
-                        if (
-                          await ask({
-                            title: `Выбрать ${labelName(item.username)}?`,
-                            description: item.username.startsWith("+")
-                              ? "Номер появится в профиле. Имя пользователя останется прежним."
-                              : `Это станет вашим текущим именем. ${wallet.data?.owned.some((n) => n.username === wallet.data?.username) ? "Прежнее имя останется в коллекции." : "Прежнее обычное имя освободится."}`,
-                            label: "Выбрать",
-                          })
-                        )
-                          action.mutate({
-                            path: "/activate",
-                            username: item.username,
-                          });
-                      }}
-                    >
-                      Выбрать
-                    </button>
-                  )}
+                    <span>
+                      <strong>{labelName(item.username)}</strong>
+                      <small>
+                        В коллекции с{" "}
+                        {new Date(item.purchasedAt).toLocaleDateString("ru-RU")}
+                      </small>
+                    </span>
+                    {wallet.data?.username === item.username ||
+                    wallet.data?.collectibleNumber === item.username ? (
+                      <span className="status-pill">
+                        <Check size={11} /> Активен
+                      </span>
+                    ) : (
+                      <button
+                        className="outline"
+                        disabled={action.isPending}
+                        onClick={async () => {
+                          if (
+                            await ask({
+                              title: `Выбрать ${labelName(item.username)}?`,
+                              description: item.username.startsWith("+")
+                                ? "Номер появится в профиле. Имя пользователя останется прежним."
+                                : `Это станет вашим текущим именем. ${wallet.data?.owned.some((n) => n.username === wallet.data?.username) ? "Прежнее имя останется в коллекции." : "Прежнее обычное имя освободится."}`,
+                              label: "Выбрать",
+                            })
+                          )
+                            action.mutate({
+                              path: "/activate",
+                              username: item.username,
+                            });
+                        }}
+                      >
+                        Выбрать
+                      </button>
+                    )}
+                  </div>
+                  <label className="wallet-public-option">
+                    <input
+                      type="checkbox"
+                      checked={
+                        wallet.data?.username === item.username ||
+                        wallet.data?.collectibleNumber === item.username ||
+                        (visibility.isPending && visibility.variables?.username===item.username ? visibility.variables.visible : !!item.public)
+                      }
+                      disabled={
+                        visibility.isPending ||
+                        wallet.data?.username === item.username ||
+                        wallet.data?.collectibleNumber === item.username
+                      }
+                      onChange={(e) =>
+                        visibility.mutate({
+                          username: item.username,
+                          visible: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>
+                      {wallet.data?.username === item.username ||
+                      wallet.data?.collectibleNumber === item.username
+                        ? "Основной адрес · виден в профиле"
+                        : "Показывать в профиле"}
+                    </span>
+                  </label>
                 </div>
               ))
             ) : (
               <div className="wallet-empty">
                 <AtSign size={28} strokeWidth={1.3} />
                 <p>
-                  Ваша коллекция начинается здесь.
+                  Коллекция пока пуста.
                   <br />
                   Первый юзернейм появится после покупки.
                 </p>
@@ -226,7 +287,7 @@ export function Wallet({ onBack }: { onBack: () => void }) {
           <section className="wallet-card">
             <div className="wallet-card-heading">
               <AtSign size={20} />
-              <h2>Ваше особенное имя</h2>
+              <h2>Купить имя или номер</h2>
             </div>
             <p>
               Буквенное имя, короткий @номер или коллекционный номер с плюсом.

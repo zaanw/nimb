@@ -1,0 +1,1 @@
+ALTER TABLE "UsernamePurchase" ADD COLUMN "public" BOOLEAN NOT NULL DEFAULT false;

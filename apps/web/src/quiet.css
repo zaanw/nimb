@@ -1,0 +1,583 @@
+/* Product surfaces: a familiar dark messenger, without ornamental light effects. */
+:root {
+  --bg: #151b23;
+  --surface: #1d2530;
+  --raised: #26313d;
+  --hover: #2b3743;
+  --line: #a8bace12;
+  --line-strong: #a8bace22;
+  --text: #e9ecf0;
+  --secondary: #b9c2cd;
+  --muted: #8c9baa;
+  --accent: #c9b28b;
+  --radius: 10px;
+}
+.shell,
+.auth {
+  background: #151b23;
+}
+.sidebar {
+  background: #19212b;
+  border-color: var(--line-strong);
+}
+.sidebar .brand {
+  color: var(--text);
+}
+.sidebar .brand-period {
+  color: var(--muted);
+}
+.sidebar button.active {
+  background: #aebed00c;
+  border-color: transparent;
+}
+.sidebar button.active::before {
+  background: #c9b28b;
+}
+.mobile-nav {
+  background: #1b242e;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.mobile-nav button.active {
+  background: #aebed00d;
+  color: #dec8a6;
+}
+.page-heading {
+  margin-bottom: 22px;
+}
+.page-heading .eyebrow {
+  display: none;
+}
+.page-heading h1 {
+  font-size: 25px;
+  letter-spacing: -0.5px;
+}
+.page-heading p {
+  font-size: 12px;
+}
+.primary,
+.control-button.solid {
+  background: #cbb58f;
+  color: #25231e;
+  box-shadow: none;
+  border-color: #cbb58f;
+}
+.primary:hover:not(:disabled),
+.control-button.solid:hover:not(:disabled) {
+  background: #dbc6a4;
+}
+.icon-button,
+.outline {
+  background: transparent;
+  border-color: var(--line-strong);
+  border-radius: 9px;
+}
+.avatar {
+  background: #344352;
+  box-shadow: none;
+  color: #e6e9ed;
+}
+.conversation-list {
+  background: #1b242e;
+}
+.chat-header {
+  background: #1c2631;
+}
+.message-area {
+  background-color: #151e28;
+}
+.conversation-placeholder,
+.conversation-screen {
+  background: #151e28;
+}
+.bubble {
+  background: #2a3846;
+  box-shadow: none;
+  border-color: transparent;
+  border-radius: 12px 12px 12px 3px;
+}
+.mine .bubble {
+  background: #c8b38f;
+  border-color: transparent;
+  color: #26241f;
+  border-radius: 12px 12px 3px 12px;
+}
+.composer-wrap {
+  background: #19232d;
+}
+.composer {
+  background: #24313e;
+  border-color: #acbbcc23;
+  box-shadow: none;
+  border-radius: 11px;
+}
+.composer > button {
+  background: #cbb58f;
+}
+.message-date {
+  background: #22303c;
+  border: 0;
+}
+.message-tools {
+  background: #263441;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px #0004;
+  max-height: 65dvh;
+  overflow: auto;
+}
+.chat-list-item.selected {
+  background: #a1b6cf0e;
+}
+.chat-list-item:hover {
+  background: #a1b6cf09;
+}
+.post,
+.post-compose,
+.context-card,
+.profile-identity-card,
+.profile-about,
+.profile-collection,
+.wallet-card,
+.settings-list,
+.setting-detail,
+.settings-profile,
+.auth-card,
+.modal,
+.confirm-dialog {
+  background: #1d2732;
+  box-shadow: none;
+  border-color: var(--line-strong);
+  border-radius: 12px;
+}
+.post-compose,
+.post {
+  padding: 20px;
+}
+.post-text {
+  color: #dbe1e8;
+}
+.post-compose textarea {
+  background: #17212b;
+  border-radius: 9px;
+}
+.profile-cover-default {
+  background: color-mix(in srgb, var(--profile-color) 12%, #202b36);
+  height: 125px;
+}
+.profile-cover-default::after {
+  display: none;
+}
+.profile-cover-word,
+.profile-cover-caption {
+  display: none;
+}
+.profile-admin-link {
+  background: #232e38;
+  border-color: var(--line-strong);
+}
+.wallet-balance-card {
+  background: #c6b493;
+  color: #28251f;
+  box-shadow: none;
+  border-radius: 12px;
+}
+.wallet-balance-card .balance-number {
+  font-size: 42px;
+}
+.welcome-symbol {
+  background: #23313f;
+  color: #b7c5d1;
+  border-radius: 18px;
+  box-shadow: none;
+  transform: none;
+}
+.welcome-symbol svg {
+  transform: none;
+}
+.conversation-welcome h1 {
+  font-size: 27px;
+}
+.conversation-welcome .eyebrow,
+.welcome-footnote {
+  display: none;
+}
+.profile-title h1 {
+  font-size: 24px;
+}
+.gift-tile {
+  box-shadow: none;
+}
+.admin-console .control-heading {
+  background: #202b35;
+  border-color: var(--line-strong);
+  border-radius: 12px;
+  box-shadow: none;
+  min-height: 135px;
+  padding: 24px;
+}
+.control-heading-art,
+.control-breadcrumb {
+  display: none;
+}
+.control-heading h1 {
+  font-size: 29px;
+  margin: 0 0 10px;
+}
+.control-heading h1 > span {
+  color: inherit;
+}
+.control-metrics > div,
+.control-metrics > button,
+.control-panel,
+.control-inspector,
+.control-shortcuts > button {
+  background: #202a35;
+  box-shadow: none;
+  border-radius: 12px;
+  border-color: var(--line-strong);
+}
+.control-symbol {
+  background: #b3c6dc0a;
+  box-shadow: none;
+  border-radius: 9px;
+}
+.control-tabs button.active {
+  text-shadow: none;
+}
+.control-tabs button.active::after {
+  box-shadow: none;
+  height: 2px;
+}
+.control-recipient,
+.control-review {
+  background: #18232e;
+}
+.plus-emblem {
+  background: #bda886;
+  box-shadow: none;
+  border-radius: 13px;
+}
+.plus-locked,
+.identity-preview {
+  background: #192733;
+  border-color: var(--line-strong);
+}
+.preview-orbit {
+  display: none;
+}
+.media-editor {
+  box-shadow: none;
+}
+.edit-modal .media-editor {
+  background: #202c37;
+}
+.chat-filters {
+  display: flex;
+  gap: 4px;
+  padding: 0 15px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.chat-filters button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  border-radius: 6px;
+}
+.chat-filters button.active {
+  background: #b1c7dd0d;
+  color: var(--text);
+}
+.saved-chat-avatar {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: #a6bdd714;
+  border-radius: 50%;
+  color: #b5c9df;
+  flex: none;
+}
+.saved-chat {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 15px !important;
+  margin-bottom: 10px;
+}
+.chat-pin-indicator {
+  flex: none;
+  color: #92a4b6;
+  margin-left: 5px;
+}
+.chat-item-meta {
+  gap: 8px;
+}
+.chat-actions-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 20px;
+}
+.chat-actions-list button {
+  display: flex;
+  gap: 12px;
+  text-align: left;
+  align-items: center;
+  padding: 14px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+.chat-actions-list button:hover {
+  background: #a4b6c80a;
+}
+.chat-actions-list small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 5px;
+  color: var(--muted);
+}
+.saved-screen {
+  max-width: 820px;
+  margin: auto;
+}
+.saved-search {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #1e2935;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  margin-bottom: 20px;
+}
+.saved-search input {
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 13px 0;
+}
+.saved-card {
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #1d2732;
+  margin-bottom: 12px;
+}
+.saved-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.saved-author {
+  min-width: 0;
+}
+.saved-author small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 6px;
+}
+.saved-card p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  margin: 18px 0;
+}
+.saved-card .text-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.saved-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 18px;
+}
+.saved-empty {
+  text-align: center;
+  padding: 65px 20px;
+  color: var(--muted);
+}
+.saved-empty h2 {
+  font-size: 17px;
+  color: var(--secondary);
+  margin-top: 18px;
+}
+.saved-empty p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.copy-feedback {
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.7;
+}
+.message-author .user-name {
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .page-heading h1 {
+    font-size: 25px;
+  }
+  .chat-header {
+    gap: 9px;
+  }
+  .chat-header .icon-button {
+    width: 34px;
+    height: 36px;
+    flex: none;
+  }
+  .chat-filters {
+    padding-left: 16px;
+  }
+  .saved-search input {
+    font-size: 16px;
+  }
+  .saved-card {
+    padding: 17px;
+  }
+  .post,
+  .post-compose {
+    padding: 17px;
+  }
+  .admin-console .control-heading {
+    min-height: 130px;
+    padding: 22px 17px;
+  }
+  .control-heading h1 {
+    font-size: 26px;
+  }
+  .control-heading-copy {
+    max-width: calc(100% - 20px);
+  }
+}
+
+.profile-cover-default {
+  height: 100px;
+}
+.profile-collection {
+  min-height: 180px;
+}
+.profile-collection .gifts-section > .muted {
+  min-height: 75px;
+}
+.plus-heading .eyebrow,
+.context-footer {
+  display: none;
+}
+
+.profile-addresses {
+  margin: 4px 28px 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.profile-address-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 0 5px;
+  color: #879bab;
+}
+.profile-address-row > svg {
+  margin-top: 4px;
+  flex: none;
+}
+.profile-address-copy {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.7;
+  font-size: 13px;
+}
+.profile-address {
+  color: #77b9ef;
+  background: none;
+  border: 0;
+  padding: 0;
+  line-height: 1.7;
+  text-align: left;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.profile-address:hover {
+  text-decoration: underline;
+}
+.profile-address-copy > small {
+  display: block;
+  color: #8598ab;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.profile-also {
+  color: #91a6b8;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.address-copy {
+  display: grid;
+  place-items: center;
+  color: #8eafc8;
+  border: 0;
+  background: none;
+  padding: 6px;
+  border-radius: 6px;
+}
+.address-copy:hover {
+  background: #9ab9d20c;
+}
+.address-notice {
+  display: block;
+  color: #a6c7af;
+  font-size: 11px;
+  margin: 10px 0 0;
+}
+.address-expand {
+  display: block;
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  color: #9ebad0;
+  font-size: 11px;
+}
+.wallet-public-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 0 0 13px 45px;
+}
+.wallet-public-option input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+.wallet-ownership-item {
+  border-bottom: 1px solid var(--line);
+}
+.wallet-ownership-item:last-child {
+  border-bottom: 0;
+}
+.wallet-ownership-item .wallet-owned {
+  border-bottom: 0;
+}
+@media (max-width: 760px) {
+  .profile-addresses {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+  .profile-address-row {
+    gap: 12px;
+  }
+  .profile-address-copy {
+    font-size: 13px;
+  }
+  .profile-also {
+    font-size: 12px;
+  }
+}

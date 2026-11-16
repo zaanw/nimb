@@ -15,6 +15,7 @@ model User {
   onlineVisible Boolean @default(true)
   messagesFrom String @default("everyone")
   links Json @default("[]")
+  savedMessages SavedMessage[]
   profileImages ProfileImage[]
   avatarKey String?
   bannerKey String?
@@ -93,6 +94,8 @@ model Member {
   chatId Int
   userId Int
   role String @default("member")
+  chatPinned Boolean @default(false)
+  archived Boolean @default(false)
   lastReadId Int @default(0)
   chat Chat @relation(fields:[chatId], references:[id], onDelete: Cascade)
   user User @relation(fields:[userId], references:[id], onDelete: Cascade)
@@ -109,6 +112,7 @@ model Message {
   editedAt DateTime?
   replyTo Message? @relation("MessageReplies", fields:[replyToId], references:[id], onDelete: SetNull)
   replies Message[] @relation("MessageReplies")
+  savedBy SavedMessage[]
   reactions Reaction[]
   views MessageView[]
   deliveries MessageDelivery[]
@@ -238,6 +242,7 @@ model CurrencyGrant {
   @@index([recipientId, createdAt])
 }
 model UsernamePurchase {
+  public Boolean @default(false)
   id Int @id @default(autoincrement())
   username String @unique
   ownerId Int
@@ -328,4 +333,15 @@ model ProfileImage {
   updatedAt DateTime @updatedAt
   user User @relation(fields:[userId], references:[id], onDelete:Cascade)
   @@id([userId,kind])
+}
+
+model SavedMessage {
+  id Int @id @default(autoincrement())
+  userId Int
+  messageId Int
+  savedAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  message Message @relation(fields:[messageId], references:[id], onDelete:Cascade)
+  @@unique([userId,messageId])
+  @@index([userId,id])
 }

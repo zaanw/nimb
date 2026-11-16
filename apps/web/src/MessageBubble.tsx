@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { UserName, type Identity } from "./Identity";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -11,6 +12,7 @@ export type Message = {
   createdAt: string;
   editedAt?: string | null;
   pinned?: boolean;
+  saved?: boolean;
   forwarded?: boolean;
   viewCount?: number;
   delivered?: boolean;
@@ -39,6 +41,8 @@ export function MessageBubble({
   onForward: (m: Message) => void;
   onError: (s: string) => void;
 }) {
+  const qc = useQueryClient();
+  const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.text);
@@ -55,6 +59,8 @@ export function MessageBubble({
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Ошибка запроса");
+      qc.invalidateQueries({ queryKey: ["messages", m.chatId] });
+      qc.invalidateQueries({ queryKey: ["saved"] });
       setMenu(false);
       setEditing(false);
     } catch (e) {
@@ -188,6 +194,11 @@ export function MessageBubble({
             )}
           </time>
         </div>
+        {copied && (
+          <span className="copy-feedback" role="status">
+            Скопировано
+          </span>
+        )}
         {menu && (
           <div className="message-tools">
             <div className="message-reactions">
@@ -219,6 +230,30 @@ export function MessageBubble({
               }}
             >
               Переслать
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                action(`/messages/${m.id}/saved`, "PUT", { saved: !m.saved })
+              }
+            >
+              {m.saved ? "Убрать из избранного" : "В избранное"}
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(m.text);
+                  setMenu(false);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  onError(
+                    "Не удалось скопировать. Разрешите доступ к буферу обмена.",
+                  );
+                }
+              }}
+            >
+              Копировать текст
             </button>
             {canPin && (
               <button

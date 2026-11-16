@@ -247,17 +247,17 @@ export function IdentitySettings({ user }: { user: Identity }) {
           <Plus size={30} />
         </span>
         <div>
-          <span className="eyebrow">ВАШ ХАРАКТЕР</span>
+          <span className="eyebrow">ПЕРСОНАЛИЗАЦИЯ</span>
           <h2>nimb Plus</h2>
         </div>
       </div>
       <p>
-        Имя, которое запоминают. Выберите свой шрифт, свечение и цвет профиля.
+        Шрифт, эффект имени и цвет профиля.
       </p>
       {!allowed ? (
         <div className="plus-locked">
           <Sparkles size={24} />
-          <h3>Чуть больше вас</h3>
+          <h3>Plus не подключён</h3>
           <p>
             Plus подключает владелец nimb. Подписка открывает оформление имени и
             обложки, а рядом с ником появляется значок Plus.

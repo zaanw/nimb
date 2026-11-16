@@ -53,6 +53,9 @@ import {
   Wallet as WalletIcon,
   Hash,
   AtSign,
+  Bookmark,
+  Archive,
+  Pin,
   PanelLeft,
   ArrowUpRight,
 } from "lucide-react";
@@ -87,8 +90,11 @@ import {
 import { Admin } from "./Admin";
 import { InstallApp, useInstallApp } from "./InstallApp";
 import { Wallet } from "./Wallet";
+import { ChatTools, SavedMessages, usePersistentDrafts } from "./ChatExtras";
+import { ProfileIdentifiers } from "./ProfileIdentifiers";
 import { UserName, IdentitySettings, type Identity } from "./Identity";
 import "./theme.css";
+import "./quiet.css";
 initializePreferences();
 
 type User = Identity & {
@@ -116,7 +122,13 @@ type Chat = {
   title: string;
   description: string;
   media?: { hasAvatar: boolean; hasBanner: boolean; version: number } | null;
-  members: { user: User; role: string; lastReadId: number }[];
+  members: {
+    user: User;
+    role: string;
+    lastReadId: number;
+    chatPinned?: boolean;
+    archived?: boolean;
+  }[];
   messages?: Message[];
 };
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -193,7 +205,11 @@ function App() {
   const [settingsSearch, setSettingsSearch] = useState("");
   const [activeFolder, setActiveFolder] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [drafts, setDrafts] = usePersistentDrafts(me.data?.user.id);
+  const [chatFilter, setChatFilter] = useState<"all" | "unread" | "archive">(
+    "all",
+  );
+  const [chatTools, setChatTools] = useState(false);
   const text = selected ? drafts[selected.id] || "" : "";
   function setText(value: string) {
     if (selected)
@@ -232,6 +248,7 @@ function App() {
           "profile",
           "settings",
           "wallet",
+          "saved",
           ...(me.data?.isAdmin ? ["admin"] : []),
         ].includes(saved.tab)
           ? saved.tab
@@ -326,6 +343,11 @@ function App() {
       qc.invalidateQueries({ queryKey: ["wallet"] });
       qc.invalidateQueries({ queryKey: ["account"] });
     });
+    socket.on("personal:update", () => {
+      qc.invalidateQueries({ queryKey: ["chats"] });
+      qc.invalidateQueries({ queryKey: ["saved"] });
+      qc.invalidateQueries({ queryKey: ["messages"] });
+    });
     socket.on("gift:new", async () => {
       await qc.cancelQueries({ queryKey: ["gifts"] });
       await qc.invalidateQueries({ queryKey: ["gifts"] });
@@ -336,6 +358,7 @@ function App() {
         qc.invalidateQueries({ queryKey: ["wallet"] });
       }
       qc.invalidateQueries({ queryKey: ["profile", payload.id] });
+      qc.invalidateQueries({ queryKey: ["identifiers", payload.id] });
       qc.invalidateQueries({ queryKey: ["gifts", payload.id] });
       qc.invalidateQueries({ queryKey: ["badges", payload.id] });
       qc.invalidateQueries({ queryKey: ["users"] });
@@ -522,12 +545,29 @@ function App() {
   const selectedFolder = folders.data?.folders.find(
     (folder) => folder.id === activeFolder,
   );
-  const visibleChats = (chats.data?.chats || []).filter(
-    (chat) =>
-      !activeFolder ||
-      !selectedFolder ||
-      selectedFolder.chatIds.includes(chat.id),
-  );
+  const ownPreferences = (chat: Chat) =>
+    chat.members.find((m) => m.user.id === user.id);
+  const isUnread = (chat: Chat) =>
+    !!chat.messages?.[0] &&
+    chat.messages[0].senderId !== user.id &&
+    chat.messages[0].id > (ownPreferences(chat)?.lastReadId || 0);
+  const visibleChats = (chats.data?.chats || [])
+    .filter(
+      (chat) =>
+        (chatFilter === "archive"
+          ? ownPreferences(chat)?.archived
+          : !ownPreferences(chat)?.archived) &&
+        (chatFilter !== "unread" || isUnread(chat)) &&
+        (!activeFolder ||
+          !selectedFolder ||
+          selectedFolder.chatIds.includes(chat.id)),
+    )
+    .sort(
+      (a, b) =>
+        Number(!!ownPreferences(b)?.chatPinned) -
+          Number(!!ownPreferences(a)?.chatPinned) ||
+        (b.messages?.[0]?.id || b.id) - (a.messages?.[0]?.id || a.id),
+    );
   const currentChat = selected
     ? chats.data?.chats.find((c) => c.id === selected.id) || selected
     : null;
@@ -702,6 +742,22 @@ function App() {
                 <Plus size={17} />
               </button>
             </div>
+            <div className="chat-filters" aria-label="Фильтр переписок">
+              {[
+                ["all", "Все"],
+                ["unread", "Непрочитанные"],
+                ["archive", "Архив"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  className={chatFilter === value ? "active" : ""}
+                  aria-pressed={chatFilter === value}
+                  onClick={() => setChatFilter(value as typeof chatFilter)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="chat-list-scroll">
               {search.trim() ? (
                 <>
@@ -803,6 +859,19 @@ function App() {
                     </span>
                     <ChevronRight size={15} />
                   </button>
+                  <button
+                    className="saved-chat list-item"
+                    onClick={() => nav("saved")}
+                  >
+                    <span className="saved-chat-avatar">
+                      <Bookmark size={20} />
+                    </span>
+                    <span className="item-copy">
+                      <strong>Избранное</strong>
+                      <small>Сохранённые сообщения</small>
+                    </span>
+                    <ChevronRight size={15} />
+                  </button>
                   <div className="list-section-label">
                     ПЕРЕПИСКИ <span>{visibleChats.length}</span>
                   </div>
@@ -867,14 +936,19 @@ function App() {
                           <span className="item-copy">
                             <strong>
                               <UserName user={u} />
+                              {ownMember?.chatPinned && (
+                                <Pin className="chat-pin-indicator" size={12} />
+                              )}
                             </strong>
                             <small>
-                              {typingChat === c.id
-                                ? "Печатает…"
-                                : latest?.text ||
-                                  (latest?.attachment
-                                    ? "Вложение"
-                                    : "Нет сообщений")}
+                              {drafts[c.id]
+                                ? `Черновик: ${drafts[c.id]}`
+                                : typingChat === c.id
+                                  ? "Печатает…"
+                                  : latest?.text ||
+                                    (latest?.attachment
+                                      ? "Вложение"
+                                      : "Нет сообщений")}
                             </small>
                           </span>
                           <span className="chat-item-meta">
@@ -902,9 +976,19 @@ function App() {
                       <strong>
                         {activeFolder
                           ? "В папке пока пусто"
-                          : "Ваш первый разговор — впереди"}
+                          : chatFilter === "archive"
+                            ? "Архив пуст"
+                            : chatFilter === "unread"
+                              ? "Всё прочитано"
+                              : "Пока нет переписок"}
                       </strong>
-                      <p>Найдите человека по имени или @юзернейму.</p>
+                      <p>
+                        {chatFilter === "all"
+                          ? "Найдите человека по имени или @юзернейму."
+                          : chatFilter === "archive"
+                            ? "Здесь будут чаты, которые вы убрали в архив."
+                            : "Новые сообщения появятся здесь."}
+                      </p>
                       <button
                         className="text-action"
                         onClick={() =>
@@ -958,6 +1042,16 @@ function App() {
           >
             {walletOpen ? (
               <Wallet onBack={() => nav("chats")} />
+            ) : tab === "saved" ? (
+              <SavedMessages
+                openChat={(id) => {
+                  const chat = chats.data?.chats.find((c) => c.id === id);
+                  if (chat) {
+                    nav("chats");
+                    setSelected(chat);
+                  } else setError("Переписка недоступна");
+                }}
+              />
             ) : selected && other ? (
               <>
                 <header className="chat-header">
@@ -1001,6 +1095,13 @@ function App() {
                     }
                   >
                     {showMessageSearch ? <X size={20} /> : <Search size={20} />}
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Действия с чатом"
+                    onClick={() => setChatTools(true)}
+                  >
+                    <MoreHorizontal size={20} />
                   </button>
                 </header>
                 {profile && (
@@ -1253,7 +1354,7 @@ function App() {
                   <PageHeading
                     eyebrow="ПОД ВАС"
                     title="Настройки"
-                    description="Ваш аккаунт. Ваши правила."
+                    description="Аккаунт, безопасность и оформление."
                   />
                 </header>
                 {setting ? (
@@ -1510,6 +1611,21 @@ function App() {
           </div>
         </div>
       )}
+      {chatTools && currentChat && other && (
+        <ChatTools
+          chatId={currentChat.id}
+          title={other.name}
+          pinned={!!ownPreferences(currentChat)?.chatPinned}
+          archived={!!ownPreferences(currentChat)?.archived}
+          onClose={() => setChatTools(false)}
+          onArchived={() => {
+            setSelected(null);
+            setChatFilter(
+              ownPreferences(currentChat)?.archived ? "all" : "archive",
+            );
+          }}
+        />
+      )}
       {communityDialog && (
         <CommunityDialog
           close={() => setCommunityDialog(false)}
@@ -1643,6 +1759,7 @@ function Nav({
         ["chats", "Сообщения", MessagesSquare],
         ["feed", "Лента", AlignJustify],
         ["wallet", "Кошелёк", WalletIcon],
+        ["saved", "Избранное", Bookmark],
         ["profile", "Мой профиль", CircleUserRound],
       ];
   return (
@@ -1797,14 +1914,8 @@ function Profile({
         {user.bioPrivate && !own && (
           <p className="muted profile-bio">Описание скрыто владельцем.</p>
         )}
+        <ProfileIdentifiers user={user} />
         <div className="profile-meta">
-          {user.collectibleNumber && (
-            <span className="profile-number">
-              <Hash size={15} />
-              {user.collectibleNumber}
-              <small>номер nimb</small>
-            </span>
-          )}
           <span>
             <Hash size={15} /> ID {user.id}
           </span>
