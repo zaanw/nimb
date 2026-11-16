@@ -214,6 +214,7 @@ function App() {
   });
   // Restore the last section and conversation for the signed-in account only.
   const restoredFor = useRef<number | null>(null);
+  const restoredChatFor = useRef<number | null>(null);
   useEffect(() => {
     const id=me.data?.user.id;
     if(!id || restoredFor.current===id)return;
@@ -225,7 +226,9 @@ function App() {
   },[me.data?.user.id]);
   useEffect(() => {
     const id=me.data?.user.id;
-    if(!id || !chats.data || selected)return;
+    if(!id || !chats.data || restoredChatFor.current===id)return;
+    restoredChatFor.current=id;
+    if(selected)return;
     try {
       const saved=JSON.parse(localStorage.getItem(`nimb:nav:${id}`)||'{}') as {chatId?:number};
       const found=chats.data.chats.find(c=>c.id===saved.chatId);
@@ -234,7 +237,7 @@ function App() {
   },[me.data?.user.id,chats.data]);
   useEffect(() => {
     const id=me.data?.user.id;
-    if(!id || restoredFor.current!==id)return;
+    if(!id || restoredFor.current!==id || restoredChatFor.current!==id)return;
     try {localStorage.setItem(`nimb:nav:${id}`,JSON.stringify({tab,chatId:selected?.id??null}));}
     catch { /* Private browsing may block storage. */ }
   },[me.data?.user.id,tab,selected?.id]);
