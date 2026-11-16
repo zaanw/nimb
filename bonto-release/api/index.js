@@ -103,6 +103,8 @@ const sendMail = createMailSender({ provider: process.env.MAIL_PROVIDER, brevoAp
 async function mailToken(userId, email, kind) { const token = randomBytes(32).toString('hex'); await db.$transaction([db.authToken.deleteMany({ where: { userId, kind } }), db.authToken.create({ data: { id: digest(token), userId, kind, expiresAt: new Date(Date.now() + (kind === 'verify' ? 24 * 3600_000 : 3600_000)) } })]); const link = `${origin}/?${kind}=${token}`; await sendMail({ to: email, subject: kind === 'verify' ? 'Подтвердите email в nimb' : 'Восстановление пароля nimb', text: `${kind === 'verify' ? 'Подтвердите ваш email' : 'Для смены пароля откройте ссылку'}:\n${link}\n\nЕсли вы не запрашивали это действие, проигнорируйте письмо.` }); }
 const account = z.object({ username: z.string().regex(/^[a-zA-Z0-9_]{3,24}$/).transform(s => s.toLowerCase()), name: z.string().trim().min(1).max(50), password: z.string().min(10).max(128) });
 app.setErrorHandler((err, _req, reply) => {
+    if (err.code === 'FST_REQ_FILE_TOO_LARGE')
+        return reply.code(413).send({ error: 'Файл слишком большой. Выберите изображение до 5 МиБ.' });
     if (err instanceof ZodError)
         return reply.code(400).send({ error: 'Проверьте введённые данные' });
     if (err.code === 'P2002')
@@ -291,31 +293,77 @@ app.get('/api/me/privacy', async (req, reply) => { const s = await auth(req, rep
     return; const privacy = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { bioPrivate: true, onlineVisible: true, messagesFrom: true } }); return { privacy }; });
 app.patch('/api/me/privacy', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const data = z.object({ bioPrivate: z.boolean().optional(), onlineVisible: z.boolean().optional(), messagesFrom: z.enum(['everyone', 'followers', 'nobody']).optional() }).refine(value => value.bioPrivate !== undefined || value.onlineVisible !== undefined || value.messagesFrom !== undefined).parse(req.body); const user = await db.user.update({ where: { id: s.userId }, data, select: publicUser }); await announceProfile(s.userId); return { user }; });
-app.put('/api/me/media/:kind', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const kind = z.enum(['avatar', 'banner']).parse(req.params.kind); const file = await req.file(); if (!file)
-    return reply.code(400).send({ error: 'Выберите изображение' }); const bytes = await file.toBuffer(); const type = await fileTypeFromBuffer(bytes); if (!type || !['image/jpeg', 'image/png', 'image/webp'].includes(type.mime))
-    return reply.code(400).send({ error: 'Допустимы только JPEG, PNG и WebP' }); let sanitized; try {
-    sanitized = await sharp(bytes, { limitInputPixels: 20_000_000 }).rotate().resize({ width: kind === 'avatar' ? 512 : 1920, height: kind === 'avatar' ? 512 : 800, fit: 'cover', withoutEnlargement: true }).webp({ quality: 84 }).toBuffer();
-}
-catch {
-    return reply.code(400).send({ error: 'Не удалось обработать изображение' });
-} const field = kind === 'avatar' ? 'avatarKey' : 'bannerKey'; const hasField = kind === 'avatar' ? 'hasAvatar' : 'hasBanner'; const previous = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { avatarKey: true, bannerKey: true } }); const key = randomBytes(24).toString('hex'); await ensureBucket(); await storage.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: sanitized, ContentType: 'image/webp' })); try {
-    const user = await db.user.update({ where: { id: s.userId }, data: { [field]: key, [hasField]: true, mediaVersion: { increment: 1 } }, select: publicUser });
+app.put('/api/me/media/:kind', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const kind = z.enum(['avatar', 'banner']).parse(req.params.kind);
+    const file = await req.file();
+    if (!file)
+        return reply.code(400).send({ error: 'Выберите изображение' });
+    const bytes = await file.toBuffer();
+    const type = await fileTypeFromBuffer(bytes);
+    if (!type || !['image/jpeg', 'image/png', 'image/webp'].includes(type.mime))
+        return reply.code(400).send({ error: 'Допустимы JPEG, PNG и WebP. Фото HEIC сначала сохраните как JPEG.' });
+    let sanitized;
+    try {
+        sanitized = await sharp(bytes, { limitInputPixels: 20_000_000 }).rotate().resize({ width: kind === 'avatar' ? 512 : 1920, height: kind === 'avatar' ? 512 : 800, fit: 'cover', withoutEnlargement: true }).webp({ quality: 84 }).toBuffer();
+    }
+    catch {
+        return reply.code(400).send({ error: 'Не удалось прочитать изображение. Выберите другое фото до 20 мегапикселей.' });
+    }
+    const field = kind === 'avatar' ? 'avatarKey' : 'bannerKey', hasField = kind === 'avatar' ? 'hasAvatar' : 'hasBanner';
+    const previous = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { avatarKey: true, bannerKey: true } });
+    const user = await db.$transaction(async (tx) => {
+        const updated = await tx.user.update({ where: { id: s.userId }, data: { [field]: null, [hasField]: true, mediaVersion: { increment: 1 } }, select: publicUser });
+        await tx.profileImage.upsert({ where: { userId_kind: { userId: s.userId, kind } }, create: { userId: s.userId, kind, data: Uint8Array.from(sanitized) }, update: { data: Uint8Array.from(sanitized) } });
+        return updated;
+    });
     if (previous[field])
-        await storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: previous[field] })).catch(err => app.log.error(err));
+        void storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: previous[field] })).catch(err => app.log.error(err, 'Legacy profile image cleanup failed'));
     await announceProfile(s.userId);
     return { user };
-}
-catch (err) {
-    await storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => { });
-    throw err;
-} });
-app.delete('/api/me/media/:kind', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const kind = z.enum(['avatar', 'banner']).parse(req.params.kind); const field = kind === 'avatar' ? 'avatarKey' : 'bannerKey'; const hasField = kind === 'avatar' ? 'hasAvatar' : 'hasBanner'; const previous = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { avatarKey: true, bannerKey: true } }); const user = await db.user.update({ where: { id: s.userId }, data: { [field]: null, [hasField]: false, mediaVersion: { increment: 1 } }, select: publicUser }); if (previous[field])
-    await storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: previous[field] })).catch(err => app.log.error(err)); await announceProfile(s.userId); return { user }; });
-app.get('/api/users/:id/media/:kind', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const id = z.coerce.number().int().positive().parse(req.params.id), kind = z.enum(['avatar', 'banner']).parse(req.params.kind); const user = await db.user.findUnique({ where: { id }, select: { avatarKey: true, bannerKey: true } }); const key = kind === 'avatar' ? user?.avatarKey : user?.bannerKey; if (!key)
-    return reply.code(404).send({ error: 'Изображение не найдено' }); await ensureBucket(); const object = await storage.send(new GetObjectCommand({ Bucket: bucket, Key: key })); return reply.header('Content-Type', 'image/webp').header('X-Content-Type-Options', 'nosniff').header('Cache-Control', 'private, no-cache').send(object.Body); });
+});
+app.delete('/api/me/media/:kind', async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const kind = z.enum(['avatar', 'banner']).parse(req.params.kind);
+    const field = kind === 'avatar' ? 'avatarKey' : 'bannerKey', hasField = kind === 'avatar' ? 'hasAvatar' : 'hasBanner';
+    const previous = await db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { avatarKey: true, bannerKey: true } });
+    const user = await db.$transaction(async (tx) => {
+        const updated = await tx.user.update({ where: { id: s.userId }, data: { [field]: null, [hasField]: false, mediaVersion: { increment: 1 } }, select: publicUser });
+        await tx.profileImage.deleteMany({ where: { userId: s.userId, kind } });
+        return updated;
+    });
+    if (previous[field])
+        void storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: previous[field] })).catch(err => app.log.error(err, 'Legacy profile image cleanup failed'));
+    await announceProfile(s.userId);
+    return { user };
+});
+app.get('/api/users/:id/media/:kind', async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const id = z.coerce.number().int().positive().parse(req.params.id), kind = z.enum(['avatar', 'banner']).parse(req.params.kind);
+    const image = await db.profileImage.findUnique({ where: { userId_kind: { userId: id, kind } }, select: { data: true } });
+    const headers = () => reply.header('Content-Type', 'image/webp').header('X-Content-Type-Options', 'nosniff').header('Cache-Control', 'private, no-cache');
+    if (image)
+        return headers().send(Buffer.from(image.data));
+    const user = await db.user.findUnique({ where: { id }, select: { avatarKey: true, bannerKey: true } });
+    const key = kind === 'avatar' ? user?.avatarKey : user?.bannerKey;
+    if (!key)
+        return reply.code(404).send({ error: 'Изображение не найдено' });
+    try {
+        await ensureBucket();
+        const object = await storage.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+        return headers().send(object.Body);
+    }
+    catch (error) {
+        app.log.error(error, 'Legacy profile image unavailable');
+        return reply.code(503).send({ error: 'Старое изображение временно недоступно. Владелец профиля может загрузить его заново.' });
+    }
+});
 app.put('/api/me/music', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const file = await req.file(); if (!file)
     return reply.code(400).send({ error: 'Выберите аудиофайл' }); const field = file.fields.metadata; let raw; try {
