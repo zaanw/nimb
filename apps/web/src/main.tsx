@@ -167,6 +167,20 @@ function ChatAvatar({ chat, user }: { chat: Chat; user: User }) {
     </div>
   );
 }
+function VerifiedName({user}:{user:User}) {
+  const awards=useQuery({
+    queryKey:["badges",user.id],
+    queryFn:()=>api<{badges:{id:string}[]}>(`/users/${user.id}/badges`),
+    staleTime:60_000,
+  });
+  const verified=awards.data?.badges.some(b=>b.id==="verified");
+  const plus=awards.data?.badges.some(b=>b.id==="plus");
+  return <span className="nimb-display-name">
+    <span>{user.name}</span>
+    {verified&&<span className="nimb-verified" title="Проверено Nimb" aria-label="Проверено Nimb"><Check size={12} strokeWidth={3.4}/></span>}
+    {plus&&<span className="nimb-plus-mark" title="Nimb Plus">✦</span>}
+  </span>;
+}
 function App() {
   const qc = useQueryClient();
   const installApp = useInstallApp();
@@ -1670,7 +1684,7 @@ function Profile({
         <div className="profile-identity">
           <Avatar user={user} size="large" />
           <div className="profile-title">
-            <h1>{user.name}</h1>
+            <h1><VerifiedName user={user}/></h1>
             <span>@{user.username}</span>
             {user.online !== undefined && user.online !== null && (
               <small className="profile-status">
