@@ -3446,3 +3446,9 @@ html[data-reduce-motion="true"] *:after {
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
+
+/* Nimb identity marks: original artwork, not Telegram assets */
+.nimb-display-name{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+.nimb-verified{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;background:#fff;color:#161a24;box-shadow:0 1px 6px rgba(255,255,255,.24)}
+.nimb-plus-mark{font-size:.6em;color:#d6c0ff;text-shadow:0 0 12px rgba(179,136,255,.6)}
+@media(prefers-reduced-motion:no-preference){.nimb-verified{transition:transform .2s}.nimb-display-name:hover .nimb-verified{transform:scale(1.08)}}
