@@ -229,6 +229,8 @@ function App() {
   // Restore the last section and conversation for the signed-in account only.
   const restoredFor = useRef<number | null>(null);
   const restoredChatFor = useRef<number | null>(null);
+  const [navReadyFor,setNavReadyFor] = useState<number | null>(null);
+  const [chatReadyFor,setChatReadyFor] = useState<number | null>(null);
   useEffect(() => {
     const id=me.data?.user.id;
     if(!id || restoredFor.current===id)return;
@@ -237,6 +239,7 @@ function App() {
       const saved=JSON.parse(localStorage.getItem(`nimb:nav:${id}`)||'{}') as {tab?:string;chatId?:number};
       if(saved.tab && ['chats','feed','profile','settings'].includes(saved.tab))setTab(saved.tab);
     } catch { /* Storage may be disabled. */ }
+    setNavReadyFor(id);
   },[me.data?.user.id]);
   useEffect(() => {
     const id=me.data?.user.id;
@@ -248,13 +251,14 @@ function App() {
       const found=chats.data.chats.find(c=>c.id===saved.chatId);
       if(found && tab==='chats')setSelected(found);
     } catch { /* Ignore invalid local state. */ }
+    setChatReadyFor(id);
   },[me.data?.user.id,chats.data]);
   useEffect(() => {
     const id=me.data?.user.id;
-    if(!id || restoredFor.current!==id || restoredChatFor.current!==id)return;
+    if(!id || navReadyFor!==id || chatReadyFor!==id)return;
     try {localStorage.setItem(`nimb:nav:${id}`,JSON.stringify({tab,chatId:selected?.id??null}));}
     catch { /* Private browsing may block storage. */ }
-  },[me.data?.user.id,tab,selected?.id]);
+  },[me.data?.user.id,tab,selected?.id,navReadyFor,chatReadyFor]);
   const users = useQuery({
     queryKey: ["users", search],
     queryFn: () =>
