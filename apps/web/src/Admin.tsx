@@ -545,6 +545,53 @@ function GrantDialog({
     </Dialog>
   );
 }
+
+type AwardableBadge = {id:string;name:string;icon:string;description:string};
+function OwnerBadges({user,onDone}:{user?:User;onDone:(message:string)=>void}) {
+  const [error,setError]=useState("");
+  const catalog=useQuery({
+    queryKey:["admin","awardable-badges"],
+    queryFn:()=>request<{badges:AwardableBadge[]}>("/badges"),
+    retry:false,
+  });
+  const awarded=useQuery({
+    queryKey:["badges",user?.id],
+    queryFn:async()=>{
+      const r=await fetch(`/api/users/${user!.id}/badges`,{credentials:"include"});
+      if(!r.ok)throw new Error("Не удалось загрузить значки");
+      return r.json() as Promise<{badges:{id:string}[]}>;
+    },
+    enabled:!!user && !!catalog.data,
+  });
+  const qc=useQueryClient();
+  const update=useMutation({
+    mutationFn:({badge,enabled}:{badge:string;enabled:boolean})=>request(`/users/${user!.id}/badges`,{badge,enabled}),
+    onSuccess:async(_,{badge,enabled})=>{
+      setError("");
+      await qc.invalidateQueries({queryKey:["badges",user?.id]});
+      onDone(enabled?`Значок ${badge} выдан`:`Значок ${badge} отозван`);
+    },
+    onError:(e:Error)=>setError(e.message),
+  });
+  // Non-owner administrators do not see this owner-only control.
+  if(!catalog.data)return null;
+  return <section className="control-owner-badges">
+    <h3><ShieldCheck size={19}/> Значки и верификация</h3>
+    <p>Только владелец Nimb может выдавать и отзывать эти значки. Выбери пользователя выше.</p>
+    <div className="control-owner-badge-grid">
+      {catalog.data.badges.map(b=>{
+        const has=!!awarded.data?.badges.some(a=>a.id===b.id);
+        return <button key={b.id} type="button" disabled={!user||!awarded.data||update.isPending}
+          aria-pressed={has} onClick={()=>update.mutate({badge:b.id,enabled:!has})}
+          className={has?"active":""}>
+          <span>{b.icon}</span><strong>{b.name}</strong><small>{has?"Выдан · нажми, чтобы отозвать":"Нажми, чтобы выдать"}</small>
+        </button>;
+      })}
+    </div>
+    {error&&<p role="alert">{error}</p>}
+  </section>;
+}
+
 export function Admin() {
   const [tab, setTab] = useState<"users" | "reports" | "activity">("users");
   const [search, setSearch] = useState("");
@@ -844,6 +891,7 @@ export function Admin() {
           );
         })}
       </div>
+      <OwnerBadges user={selected} onDone={(message) => { setNotice(message); qc.invalidateQueries({ queryKey: ["badges"] }); qc.invalidateQueries({ queryKey: ["admin"] }); }} />
       <nav className="control-tabs" aria-label="Разделы админ-панели">
         {(
           [
