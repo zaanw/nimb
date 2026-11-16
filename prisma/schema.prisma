@@ -34,6 +34,14 @@ model User {
   messageViews MessageView[]
   messageDeliveries MessageDelivery[]
   folders ChatFolder[]
+  verified Boolean @default(false)
+  plus Boolean @default(false)
+  nameFont String @default("default")
+  nameEffect String @default("none")
+  profileAccent String @default("gold")
+  collectibleNumber String? @unique
+  identityReceived IdentityGrant[] @relation("IdentityRecipient")
+  identityGranted IdentityGrant[] @relation("IdentityAdmin")
   passwordHash String
   emailVerified Boolean @default(false)
   nimbBalance Int @default(0)
@@ -298,4 +306,16 @@ model MessageDelivery {
   message Message @relation(fields:[messageId], references:[id], onDelete:Cascade)
   user User @relation(fields:[userId], references:[id], onDelete:Cascade)
   @@id([messageId,userId])
+}
+
+model IdentityGrant {
+  id Int @id @default(autoincrement())
+  recipientId Int
+  adminId Int
+  kind String
+  enabled Boolean
+  createdAt DateTime @default(now())
+  recipient User @relation("IdentityRecipient", fields:[recipientId], references:[id], onDelete:Cascade)
+  admin User @relation("IdentityAdmin", fields:[adminId], references:[id], onDelete:Restrict)
+  @@index([recipientId,createdAt])
 }

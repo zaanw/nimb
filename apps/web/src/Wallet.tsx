@@ -12,6 +12,7 @@ import { Brand, PageHeading, useConfirmation } from "./UI";
 type WalletData = {
   balance: number;
   username: string;
+  collectibleNumber?: string | null;
   owned: { username: string; price: number; purchasedAt: string }[];
 };
 type CheckResult = {
@@ -35,6 +36,7 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   if (!r.ok) throw new Error(data.error || "Ошибка запроса");
   return data;
 }
+const labelName = (name: string) => (name.startsWith("+") ? name : "@" + name);
 export function Wallet({ onBack }: { onBack: () => void }) {
   const qc = useQueryClient();
   const { ask, dialog } = useConfirmation();
@@ -59,7 +61,7 @@ export function Wallet({ onBack }: { onBack: () => void }) {
     onSuccess: async () => {
       setChecked(null);
       setName("");
-      setNotice("Юзернейм обновлён. Всё готово.");
+      setNotice("Коллекция обновлена. Всё готово.");
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["wallet"] }),
         qc.invalidateQueries({ queryKey: ["me"] }),
@@ -72,9 +74,15 @@ export function Wallet({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     setChecked(null);
     setNotice("");
-    const value = name.trim().replace(/^@/, "");
-    if (!/^[1-9][0-9]{0,5}$/.test(value)) {
-      setNotice("Введите от 1 до 6 цифр, без нуля в начале.");
+    const value = name.trim().toLowerCase().replace(/^@/, "");
+    if (
+      !/^(?:[1-9][0-9]{0,5}|[a-z][a-z0-9_]{2,23}|\+[1-9][0-9]{2,11})$/.test(
+        value,
+      )
+    ) {
+      setNotice(
+        "Введите имя из 3–24 латинских символов, число из 1–6 цифр или номер: + и 3–12 цифр.",
+      );
       return;
     }
     check.mutate(value);
@@ -85,9 +93,11 @@ export function Wallet({ onBack }: { onBack: () => void }) {
     const old = wallet.data.username;
     if (
       await ask({
-        title: `Купить @${selected.username}?`,
-        description: `С баланса спишется ${selected.price.toLocaleString("ru-RU")} нимбиков. @${selected.username} станет вашим текущим именем. ${/^\d+$/.test(old) ? `@${old} останется в коллекции.` : `Прежнее имя @${old} освободится.`}`,
-        label: "Купить юзернейм",
+        title: `Купить ${labelName(selected.username)}?`,
+        description: `С баланса спишется ${selected.price.toLocaleString("ru-RU")} нимбиков. ${selected.username.startsWith("+") ? "Номер появится в вашем профиле. Юзернейм останется прежним. Это внутренний номер nimb, без звонков и SMS." : `${labelName(selected.username)} станет вашим текущим именем. ${wallet.data.owned.some((n) => n.username === old) ? `@${old} останется в коллекции.` : `Прежнее имя @${old} освободится.`}`}`,
+        label: selected.username.startsWith("+")
+          ? "Купить номер"
+          : "Купить юзернейм",
       })
     )
       action.mutate({ path: "/buy", username: selected.username });
@@ -141,14 +151,14 @@ export function Wallet({ onBack }: { onBack: () => void }) {
           <div className="wallet-note">
             <Info size={15} />
             <span>
-              Нимбики — внутренняя валюта Nimb. Используйте их для покупки
-              числовых юзернеймов.
+              Нимбики — внутренняя валюта Nimb. Используйте их для покупки имён
+              и коллекционных номеров.
             </span>
           </div>
           <section className="wallet-card">
             <div className="wallet-card-heading">
               <Hash size={18} />
-              <h2>Мои юзернеймы</h2>
+              <h2>Моя коллекция</h2>
               <span className="count-tag">
                 {wallet.data?.owned.length ?? "—"}
               </span>
@@ -164,13 +174,14 @@ export function Wallet({ onBack }: { onBack: () => void }) {
                     <AtSign size={17} />
                   </span>
                   <span>
-                    <strong>@{item.username}</strong>
+                    <strong>{labelName(item.username)}</strong>
                     <small>
                       В коллекции с{" "}
                       {new Date(item.purchasedAt).toLocaleDateString("ru-RU")}
                     </small>
                   </span>
-                  {wallet.data?.username === item.username ? (
+                  {wallet.data?.username === item.username ||
+                  wallet.data?.collectibleNumber === item.username ? (
                     <span className="status-pill">
                       <Check size={11} /> Активен
                     </span>
@@ -181,8 +192,10 @@ export function Wallet({ onBack }: { onBack: () => void }) {
                       onClick={async () => {
                         if (
                           await ask({
-                            title: `Выбрать @${item.username}?`,
-                            description: `Этот юзернейм станет вашим текущим именем. ${/^\d+$/.test(wallet.data?.username || "") ? "Прежний числовой юзернейм останется в коллекции." : "Прежнее обычное имя освободится."}`,
+                            title: `Выбрать ${labelName(item.username)}?`,
+                            description: item.username.startsWith("+")
+                              ? "Номер появится в профиле. Имя пользователя останется прежним."
+                              : `Это станет вашим текущим именем. ${wallet.data?.owned.some((n) => n.username === wallet.data?.username) ? "Прежнее имя останется в коллекции." : "Прежнее обычное имя освободится."}`,
                             label: "Выбрать",
                           })
                         )
@@ -216,31 +229,49 @@ export function Wallet({ onBack }: { onBack: () => void }) {
               <h2>Ваше особенное имя</h2>
             </div>
             <p>
-              Короткий номер вместо обычного юзернейма. Найдите свой и заберите
-              его в коллекцию.
+              Буквенное имя, короткий @номер или коллекционный номер с плюсом.
+              Найдите свой вариант.
             </p>
+            <div className="wallet-presets">
+              {["neo", "777", "+666"].map((example) => (
+                <button
+                  className="outline"
+                  key={example}
+                  disabled={check.isPending || action.isPending}
+                  onClick={() => {
+                    setName(example);
+                    setChecked(null);
+                    check.reset();
+                  }}
+                >
+                  {labelName(example)}
+                </button>
+              ))}
+            </div>
             <div className="wallet-price-list">
               <div>
-                <span>1 цифра</span>
-                <strong>10 000</strong>
+                <span>Имена</span>
+                <strong>от 1 000</strong>
                 <small>нимбиков</small>
               </div>
               <div>
-                <span>2 цифры</span>
-                <strong>5 000</strong>
+                <span>@номера</span>
+                <strong>от 1 000</strong>
                 <small>нимбиков</small>
               </div>
               <div>
-                <span>3–6 цифр</span>
-                <strong>1 000</strong>
+                <span>+номера</span>
+                <strong>от 1 000</strong>
                 <small>нимбиков</small>
               </div>
             </div>
             <form className="wallet-form" onSubmit={checkName}>
               <label>
-                <span aria-hidden="true">@</span>
+                <span aria-hidden="true">
+                  {name.startsWith("+") ? "#" : "@"}
+                </span>
                 <input
-                  aria-label="Числовой юзернейм"
+                  aria-label="Юзернейм или номер"
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -249,9 +280,11 @@ export function Wallet({ onBack }: { onBack: () => void }) {
                     check.reset();
                   }}
                   disabled={check.isPending || action.isPending}
-                  placeholder="Например, 777"
-                  inputMode="numeric"
-                  maxLength={6}
+                  placeholder="neo, 777 или +666"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={24}
                 />
               </label>
               <button
@@ -261,18 +294,21 @@ export function Wallet({ onBack }: { onBack: () => void }) {
                 {check.isPending ? "Проверяем…" : "Проверить"}
               </button>
             </form>
-            <p className="wallet-help">От 1 до 6 цифр. Без нуля в начале.</p>
+            <p className="wallet-help">
+              Имена: латиница, цифры и _. Номера: без нуля в начале. Точная цена
+              появится после проверки.
+            </p>
             {check.isError && <p className="error">{check.error.message}</p>}
             {checked && (
               <div className="wallet-result" role="status">
                 <span>
-                  <strong>@{checked.username}</strong>
+                  <strong>{labelName(checked.username)}</strong>
                   <small>
                     {checked.owned
                       ? "Уже в вашей коллекции"
                       : checked.available
                         ? `${checked.price.toLocaleString("ru-RU")} нимбиков · Свободен`
-                        : "Этот юзернейм уже занят"}
+                        : "Это имя или номер уже заняты"}
                   </small>
                   {checked.available && balance < checked.price && (
                     <small>
@@ -308,12 +344,18 @@ export function Wallet({ onBack }: { onBack: () => void }) {
           <section className="context-card">
             <h2>Как это работает</h2>
             <p>
+              Буквенные имена: 3 символа — 3 000 N, 4 — 2 000 N, от 5 — 1 000 N.
+              @номера: 1 цифра — 10 000 N, 2 — 5 000 N, 3–6 — 1 000 N. +номера:
+              3 цифры — 10 000 N, 4–6 — 5 000 N, 7–12 — 1 000 N.
+            </p>
+            <p>
               Купленное имя становится вашим @юзернеймом. Можно собрать
               несколько и переключаться между ними.
             </p>
             <p>
-              Числовой ID аккаунта остаётся прежним. Переписки, подарки и
-              публикации сохраняются.
+              Номер с + — коллекционный адрес в nimb. По нему можно найти ваш
+              профиль; для входа используйте @юзернейм. Телефонная связь и SMS
+              не предоставляются. ID аккаунта, переписки и подарки сохраняются.
             </p>
           </section>
         </div>

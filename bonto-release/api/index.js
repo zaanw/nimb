@@ -1,3 +1,4 @@
+import { identitySelect, collectibleName, collectiblePrice, lockName, registerIdentity } from './identity.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: new URL('../../../.env', import.meta.url).pathname });
 import Fastify from 'fastify';
@@ -62,7 +63,7 @@ catch (e) {
         throw e;
     await storage.send(new CreateBucketCommand({ Bucket: bucket }));
 } bucketReady = true; }
-const publicUser = { id: true, username: true, name: true, bio: true, bioPrivate: true, onlineVisible: true, links: true, hasAvatar: true, hasBanner: true, mediaVersion: true, hasMusic: true, hasMusicCover: true, musicTitle: true, musicArtist: true, musicVersion: true, createdAt: true };
+const publicUser = { ...identitySelect, id: true, username: true, name: true, bio: true, bioPrivate: true, onlineVisible: true, links: true, hasAvatar: true, hasBanner: true, mediaVersion: true, hasMusic: true, hasMusicCover: true, musicTitle: true, musicArtist: true, musicVersion: true, createdAt: true };
 const digest = (s) => createHash('sha256').update(s).digest('hex');
 async function session(token) {
     if (!token || !/^[a-f0-9]{64}$/.test(token))
@@ -123,7 +124,10 @@ app.post('/api/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute
     if (/^\d+$/.test(data.username))
         return reply.code(400).send({ error: 'Числовые имена доступны в кошельке' });
     const passwordHash = await argon2.hash(data.password, { type: argon2.argon2id });
-    const user = await db.user.create({ data: { username: data.username, name: data.name, passwordHash }, select: publicUser });
+    const user = await db.$transaction(async (tx) => { await lockName(tx, data.username); if (await tx.usernamePurchase.findUnique({ where: { username: data.username } }))
+        return null; return tx.user.create({ data: { username: data.username, name: data.name, passwordHash }, select: publicUser }); });
+    if (!user)
+        return reply.code(409).send({ error: 'Это имя уже принадлежит другому пользователю' });
     if (user.id <= 100)
         await db.badgeAward.upsert({ where: { userId_badge: { userId: user.id, badge: 'early' } }, create: { userId: user.id, badge: 'early' }, update: {} });
     await setSession(user.id, reply);
@@ -177,7 +181,7 @@ async function adminAuth(req, reply) { const s = await auth(req, reply); if (!s)
     reply.code(403).send({ error: 'Доступ запрещён' });
     return null;
 } return s; }
-const adminUserSelect = { id: true, username: true, name: true, createdAt: true, suspended: true, nimbBalance: true, hasAvatar: true, mediaVersion: true };
+const adminUserSelect = { ...identitySelect, id: true, username: true, name: true, createdAt: true, suspended: true, nimbBalance: true, hasAvatar: true, mediaVersion: true };
 app.get('/api/admin/overview', async (req, reply) => {
     if (!await adminAuth(req, reply))
         return;
@@ -216,15 +220,17 @@ app.get('/api/admin/activity', async (req, reply) => {
         return;
     const { userId } = z.object({ userId: z.coerce.number().int().positive().optional() }).parse(req.query);
     const who = { id: true, username: true, name: true };
-    const [currency, presents, names] = await Promise.all([
+    const [currency, presents, names, identity] = await Promise.all([
         db.currencyGrant.findMany({ where: userId ? { recipientId: userId } : {}, orderBy: { id: 'desc' }, take: 50, include: { recipient: { select: who }, admin: { select: who } } }),
         db.giftEvent.findMany({ where: userId ? { gift: { ownerId: userId } } : {}, orderBy: { id: 'desc' }, take: 50, include: { sender: { select: who }, gift: { select: { template: true, owner: { select: who } } } } }),
         db.usernamePurchase.findMany({ where: userId ? { ownerId: userId } : {}, orderBy: { id: 'desc' }, take: 50, include: { owner: { select: who }, grantedBy: { select: who } } }),
+        db.identityGrant.findMany({ where: userId ? { recipientId: userId } : {}, orderBy: { id: 'desc' }, take: 50, include: { recipient: { select: who }, admin: { select: who } } }),
     ]);
     const events = [
         ...currency.map(e => ({ id: 'currency-' + e.id, kind: 'currency', createdAt: e.createdAt, user: e.recipient, actor: e.admin, label: 'Начисление нимбиков', value: '+' + e.amount.toLocaleString('ru-RU') })),
         ...presents.map(e => ({ id: 'gift-' + e.id, kind: 'gift', createdAt: e.createdAt, user: e.gift.owner, actor: e.sender, label: 'Подарок', value: gifts[e.gift.template]?.name || e.gift.template })),
-        ...names.map(e => ({ id: 'username-' + e.id, kind: 'username', createdAt: e.purchasedAt, user: e.owner, actor: e.grantedBy, label: e.price === 0 ? 'Выдача юзернейма' : 'Покупка юзернейма', value: '@' + e.username })),
+        ...names.map(e => ({ id: 'username-' + e.id, kind: 'username', createdAt: e.purchasedAt, user: e.owner, actor: e.grantedBy, label: e.username.startsWith('+') ? (e.price === 0 ? 'Выдача номера' : 'Покупка номера') : (e.price === 0 ? 'Выдача юзернейма' : 'Покупка юзернейма'), value: e.username.startsWith('+') ? e.username : '@' + e.username })),
+        ...identity.map(e => ({ id: 'identity-' + e.id, kind: 'identity', createdAt: e.createdAt, user: e.recipient, actor: e.admin, label: e.enabled ? 'Выдача привилегии' : 'Отзыв привилегии', value: e.kind === 'verified' ? 'Верификация' : badges[e.kind]?.name || e.kind })),
     ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id)).slice(0, 50);
     return { events };
 });
@@ -233,8 +239,9 @@ app.post('/api/admin/users/:id/username', { config: { rateLimit: { max: 30, time
     if (!actor)
         return;
     const id = z.coerce.number().int().positive().parse(req.params.id);
-    const { username } = z.object({ username: z.string().regex(/^[1-9][0-9]{0,5}$/) }).parse(req.body);
+    const { username } = z.object({ username: collectibleName }).parse(req.body);
     const result = await db.$transaction(async (tx) => {
+        await lockName(tx, username);
         await tx.$executeRaw `SELECT pg_advisory_xact_lock(${id})`;
         if (!await tx.user.findUnique({ where: { id }, select: { id: true } }))
             return 'missing';
@@ -373,7 +380,7 @@ app.get('/api/users/:id/music', async (req, reply) => { const s = await auth(req
     reply.header('Content-Length', obj.ContentLength); return reply.send(obj.Body); });
 app.get('/api/users', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const { q } = z.object({ q: z.string().trim().min(1).max(50) }).parse(req.query); const term = q.startsWith('@') ? q.slice(1).trim() : q; if (!term)
-    return { users: [] }; return { users: await db.user.findMany({ where: { id: { not: s.userId }, OR: [{ username: { contains: term.toLowerCase() } }, { name: { contains: term, mode: 'insensitive' } }] }, select: publicUser, take: 20 }) }; });
+    return { users: [] }; return { users: await db.user.findMany({ where: { id: { not: s.userId }, OR: [{ username: { contains: term.toLowerCase() } }, { collectibleNumber: { contains: term } }, { name: { contains: term, mode: 'insensitive' } }] }, select: publicUser, take: 20 }) }; });
 app.get('/api/users/:id', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const user = await db.user.findUnique({ where: { id }, select: publicUser }); if (!user)
     return reply.code(404).send({ error: 'Пользователь не найден' }); return { user }; });
@@ -528,21 +535,52 @@ app.delete('/api/messages/:id', async (req, reply) => { const s = await auth(req
     catch (err) {
         app.log.error(err);
     } await notifyChat(m.chatId, 'message:delete', { id, chatId: m.chatId }); return { ok: true }; });
-const numericName = z.string().regex(/^[1-9][0-9]{0,5}$/, 'Введите число от 1 до 6 цифр без нулей в начале');
-const usernamePrice = (name) => name.length === 1 ? 10000 : name.length === 2 ? 5000 : 1000;
+registerIdentity(app, db, auth, announceProfile);
 app.get('/api/wallet', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const [user, owned] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { nimbBalance: true, username: true } }), db.usernamePurchase.findMany({ where: { ownerId: s.userId }, orderBy: { id: 'desc' }, select: { username: true, price: true, purchasedAt: true } })]); return { balance: user.nimbBalance, username: user.username, owned }; });
+    return; const [user, owned] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { nimbBalance: true, username: true, collectibleNumber: true } }), db.usernamePurchase.findMany({ where: { ownerId: s.userId }, orderBy: { id: 'desc' }, select: { username: true, price: true, purchasedAt: true } })]); return { balance: user.nimbBalance, username: user.username, collectibleNumber: user.collectibleNumber, owned }; });
 app.get('/api/wallet/check', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const { username } = z.object({ username: numericName }).parse(req.query); const [used, purchase] = await Promise.all([db.user.findUnique({ where: { username }, select: { id: true } }), db.usernamePurchase.findUnique({ where: { username }, select: { ownerId: true } })]); return { username, price: usernamePrice(username), available: !used && !purchase, owned: purchase?.ownerId === s.userId }; });
-app.post('/api/wallet/buy', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const { username } = z.object({ username: numericName }).parse(req.body); const price = usernamePrice(username); const result = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${s.userId})`; if (await tx.usernamePurchase.findUnique({ where: { username } }) || await tx.user.findUnique({ where: { username }, select: { id: true } }))
-    return 'taken'; const updated = await tx.user.updateMany({ where: { id: s.userId, nimbBalance: { gte: price } }, data: { nimbBalance: { decrement: price } } }); if (!updated.count)
-    return 'balance'; await tx.usernamePurchase.create({ data: { username, price, ownerId: s.userId } }); await tx.user.update({ where: { id: s.userId }, data: { username } }); return 'ok'; }); if (result === 'taken')
-    return reply.code(409).send({ error: 'Этот юзернейм уже занят' }); if (result === 'balance')
-    return reply.code(400).send({ error: 'Недостаточно нимбиков' }); await announceProfile(s.userId); return { ok: true }; });
-app.post('/api/wallet/activate', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const { username } = z.object({ username: numericName }).parse(req.body); const owned = await db.usernamePurchase.findFirst({ where: { username, ownerId: s.userId } }); if (!owned)
-    return reply.code(404).send({ error: 'Этот юзернейм вам не принадлежит' }); await db.user.update({ where: { id: s.userId }, data: { username } }); await announceProfile(s.userId); return { ok: true }; });
+    return; const { username } = z.object({ username: collectibleName }).parse(req.query); const [used, purchase] = await Promise.all([db.user.findUnique({ where: { username }, select: { id: true } }), db.usernamePurchase.findUnique({ where: { username }, select: { ownerId: true } })]); return { username, price: collectiblePrice(username), available: !used && !purchase, owned: purchase?.ownerId === s.userId }; });
+app.post('/api/wallet/buy', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const { username } = z.object({ username: collectibleName }).parse(req.body);
+    const price = collectiblePrice(username);
+    const result = await db.$transaction(async (tx) => {
+        await lockName(tx, username);
+        await tx.$executeRaw `SELECT pg_advisory_xact_lock(${s.userId})`;
+        if (await tx.usernamePurchase.findUnique({ where: { username } }) || await tx.user.findUnique({ where: { username }, select: { id: true } }))
+            return 'taken';
+        const updated = await tx.user.updateMany({ where: { id: s.userId, nimbBalance: { gte: price } }, data: { nimbBalance: { decrement: price } } });
+        if (!updated.count)
+            return 'balance';
+        await tx.usernamePurchase.create({ data: { username, price, ownerId: s.userId } });
+        await tx.user.update({ where: { id: s.userId }, data: username.startsWith('+') ? { collectibleNumber: username } : { username } });
+        return 'ok';
+    });
+    if (result === 'taken')
+        return reply.code(409).send({ error: 'Это имя или номер уже заняты' });
+    if (result === 'balance')
+        return reply.code(400).send({ error: 'Недостаточно нимбиков' });
+    io.to(`user:${s.userId}`).emit('wallet:update');
+    await announceProfile(s.userId);
+    return { ok: true };
+});
+app.post('/api/wallet/activate', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const { username } = z.object({ username: collectibleName }).parse(req.body);
+    const result = await db.$transaction(async (tx) => { await lockName(tx, username); await tx.$executeRaw `SELECT pg_advisory_xact_lock(${s.userId})`; if (!await tx.usernamePurchase.findFirst({ where: { username, ownerId: s.userId } }))
+        return false; await tx.user.update({ where: { id: s.userId }, data: username.startsWith('+') ? { collectibleNumber: username } : { username } }); return true; });
+    if (!result)
+        return reply.code(404).send({ error: 'Это имя или номер вам не принадлежат' });
+    io.to(`user:${s.userId}`).emit('wallet:update');
+    await announceProfile(s.userId);
+    return { ok: true };
+});
+app.delete('/api/wallet/number', async (req, reply) => { const s = await auth(req, reply); if (!s)
+    return; await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${s.userId})`; await tx.user.update({ where: { id: s.userId }, data: { collectibleNumber: null } }); }); await announceProfile(s.userId); return { ok: true }; });
 app.get('/api/catalog/gifts', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; return { templates: Object.entries(gifts).map(([id, value]) => ({ id, ...value })) }; });
 app.get('/api/users/:id/badges', async (req, reply) => { const s = await auth(req, reply); if (!s)

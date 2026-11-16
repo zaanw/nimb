@@ -1,0 +1,679 @@
+/* Midnight / champagne. Shared by every account and every screen. */
+:root {
+  --bg: #101923;
+  --surface: #1c2834;
+  --raised: #253340;
+  --hover: #2d3d4c;
+  --line: #b0c5dc14;
+  --line-strong: #b0c5dc29;
+  --text: #f4f1eb;
+  --secondary: #bac6d1;
+  --muted: #97a7b7;
+  --accent: #e8c589;
+  --profile-color: #dfbb80;
+}
+.shell,
+.auth {
+  background: #101923 url("/nimb-atmosphere.svg") center top / cover no-repeat;
+}
+.sidebar {
+  background: linear-gradient(180deg, #18222de8, #121c27f5);
+  border-color: var(--line);
+}
+.sidebar button.active {
+  background: linear-gradient(100deg, #e8c58915, #e8c58905);
+  border-color: #e8c58924;
+}
+.sidebar button.active::before {
+  background: var(--accent);
+}
+.sidebar .brand {
+  color: #f2dfc1;
+}
+.sidebar .brand-period,
+.eyebrow {
+  color: #c9b38e;
+}
+.mobile-nav {
+  background: #172331ee;
+  border-color: var(--line-strong);
+  box-shadow:
+    0 -8px 35px #050b1726,
+    inset 0 1px 0 #ffffff06;
+}
+.mobile-nav button.active {
+  background: #d3b88d17;
+  color: #f1d4a8;
+}
+.primary {
+  background: linear-gradient(115deg, #f2d7ac, #d6b37d);
+  color: #27241e;
+  border-color: #ebcfa3;
+  box-shadow:
+    inset 0 1px 0 #ffffff42,
+    0 4px 15px #e8c58909;
+}
+.primary:hover:not(:disabled) {
+  background: #f2d8ad;
+}
+.outline,
+.icon-button {
+  border-color: var(--line-strong);
+  background: #b8c9dc09;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-color: var(--accent);
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #d0b586;
+}
+.avatar {
+  background: linear-gradient(145deg, #364c61, #223446);
+  color: #e6ddd0;
+  box-shadow: inset 0 0 0 1px #c0d0e519;
+}
+.conversation-list {
+  background: linear-gradient(180deg, #1b2936ee, #14202ce8);
+}
+.conversation-screen,
+.conversation-placeholder {
+  background: transparent;
+}
+.chat-header {
+  background: #172431ed;
+  border-color: var(--line);
+}
+.message-area {
+  background-color: #101b2890;
+}
+.bubble {
+  background: linear-gradient(135deg, #293b4c, #243344);
+  border-color: #bad3ec10;
+  color: #edf0f4;
+  box-shadow: 0 3px 12px #030b131a;
+}
+.mine .bubble {
+  background: linear-gradient(130deg, #e6ceaa, #d4bb91);
+  color: #29251f;
+  border-color: #f5dfbd45;
+}
+.message-date {
+  background: #1c2a38cf;
+  color: #bac9d6;
+  border-color: var(--line);
+}
+.message-menu-toggle {
+  color: inherit;
+}
+.message-tools {
+  background: #263747;
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.composer-wrap {
+  background: #13202ddd;
+  border-color: var(--line);
+}
+.composer {
+  background: #21303edd;
+  border-color: #b4c9dc29;
+  box-shadow:
+    0 4px 24px #0002,
+    inset 0 1px 0 #ffffff05;
+}
+.composer:focus-within {
+  border-color: #d6b98588;
+}
+.composer > button {
+  background: linear-gradient(135deg, #f0d4a6, #d5b47e);
+}
+.composer > button:disabled {
+  background: #334352;
+  color: #8596a5;
+}
+.chat-row.active {
+  background: linear-gradient(100deg, #e8c58912, #e8c58904);
+  border-color: #e8c58924;
+}
+.chat-row:hover {
+  background: #b8cee60a;
+}
+.welcome-symbol {
+  color: #ddc295;
+  background: linear-gradient(145deg, #34404b, #1b2a39);
+  border-color: #d0b58138;
+  box-shadow: 0 12px 50px #c1b2780d;
+}
+.conversation-welcome p {
+  color: var(--muted);
+}
+.post,
+.post-compose,
+.context-card,
+.profile-identity-card,
+.profile-about,
+.profile-collection,
+.wallet-card,
+.settings-list,
+.setting-detail,
+.settings-profile,
+.auth-card,
+.modal,
+.confirm-dialog {
+  background: linear-gradient(145deg, #202d3bed, #192531ed);
+  border-color: var(--line-strong);
+  box-shadow:
+    0 9px 30px #030b1517,
+    inset 0 1px 0 #ffffff05;
+}
+.post-text {
+  color: #d9e1e7;
+}
+.post-compose textarea,
+.security-form input,
+.preference-form select,
+.setting-detail select,
+.settings-search,
+.search-box {
+  background-color: #122130;
+}
+.setting-icon.blue,
+.setting-icon.cyan {
+  background: #7dbbe216;
+  color: #9dc9e7;
+}
+.setting-icon.purple {
+  background: #b997df16;
+  color: #c3ade3;
+}
+.setting-icon.orange {
+  background: #dfb47816;
+  color: #e5c092;
+}
+.setting-icon.green {
+  background: #8dbbaa16;
+  color: #a1cbb6;
+}
+.settings-list > button:hover {
+  background: #b7cce609;
+}
+.profile-identity-card {
+  border-color: color-mix(in srgb, var(--profile-color) 27%, transparent);
+}
+.profile-cover-default {
+  background:
+    radial-gradient(
+      ellipse at 80% 0,
+      color-mix(in srgb, var(--profile-color) 37%, transparent),
+      transparent 62%
+    ),
+    url("/nimb-atmosphere.svg") center 30% / cover,
+    #1b2b3c;
+}
+.profile-cover-default::after {
+  content: "";
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  right: 5%;
+  top: -70px;
+  border: 1px solid color-mix(in srgb, var(--profile-color) 24%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 28px #e5c99504,
+    0 0 0 57px #e5c99504;
+  pointer-events: none;
+}
+.profile-cover-word {
+  color: #f1e1be16;
+}
+.profile-cover-caption {
+  color: #e1d5bc;
+  letter-spacing: 0.12em;
+}
+.profile-admin-link {
+  background: linear-gradient(110deg, #e8c58912, #19304480);
+  border-color: #e8c5892a;
+}
+.profile-admin-link:hover {
+  background: #263444;
+}
+.profile-number {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.profile-number small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.wallet-balance-card {
+  background:
+    radial-gradient(ellipse at 100% 0, #fff7d999, transparent 65%),
+    linear-gradient(135deg, #e9d2af, #c8aa7e);
+  box-shadow:
+    0 16px 45px #cfb58012,
+    inset 0 1px 0 #fff5;
+  color: #2e281f;
+}
+.wallet-balance-card .wallet-balance-label,
+.wallet-balance-card .balance-unit {
+  color: #66543e;
+}
+.wallet-owned-icon {
+  background: #e8c5890c;
+  color: #e7c994;
+}
+.wallet-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.wallet-presets button {
+  min-height: 38px;
+  padding: 8px 14px;
+  color: var(--accent);
+}
+.wallet-price-list strong {
+  font-size: 13px;
+}
+.gift-tile {
+  background: linear-gradient(145deg, #2d3c4c, #1b2938) !important;
+}
+.gift-tile.rose {
+  background: linear-gradient(145deg, #543344, #271e33) !important;
+}
+.gift-tile.gold {
+  background: linear-gradient(145deg, #5b4b30, #292b32) !important;
+}
+.gift-tile.mint {
+  background: linear-gradient(145deg, #2d504f, #1b2b38) !important;
+}
+.gift-tile.violet,
+.gift-tile.indigo {
+  background: linear-gradient(145deg, #494068, #25283e) !important;
+}
+.gift-tile span,
+.badge-list button > span:first-child,
+.gift-detail-icon {
+  filter: none;
+}
+/* Public identity: one renderer for profile, messages, search and feed. */
+.user-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+}
+.user-name .name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.verified-badge {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: #fff;
+  filter: drop-shadow(0 1px 3px #0002);
+}
+.plus-inline {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 5px;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  background: #e7c995;
+  color: #2a2631;
+}
+.font-inter {
+  font-family: Inter, sans-serif;
+}
+.font-rubik {
+  font-family: Rubik, sans-serif;
+}
+.font-serif {
+  font-family: Georgia, "Times New Roman", serif;
+}
+.font-mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+.effect-gold,
+.effect-aurora,
+.effect-rainbow {
+  color: #eed5a2;
+  background: linear-gradient(110deg, #caa56c, #fff2d1, #dcb676);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.effect-aurora {
+  background-image: linear-gradient(110deg, #8ce5cc, #98c5fc, #d3b4fa, #8ce5cc);
+}
+.effect-rainbow {
+  background-image: linear-gradient(
+    100deg,
+    #ffb6a9,
+    #f9d77e,
+    #b7ecab,
+    #94d9ef,
+    #c3b2ff,
+    #f5b5dc,
+    #ffb6a9
+  );
+  background-size: 300% auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .effect-gold,
+  .effect-aurora,
+  .effect-rainbow {
+    animation: nimb-name-flow 9s linear infinite;
+  }
+  @keyframes nimb-name-flow {
+    to {
+      background-position: 200% center;
+    }
+  }
+}
+html[data-reduce-motion="true"] .name-text {
+  animation: none;
+}
+.accent-gold {
+  --profile-color: #dfbb80;
+}
+.accent-violet {
+  --profile-color: #b4a0ed;
+}
+.accent-ocean {
+  --profile-color: #83c9ef;
+}
+.accent-rose {
+  --profile-color: #e6a3b5;
+}
+.accent-mint {
+  --profile-color: #8fceba;
+}
+.badge-token {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 10px !important;
+  background: #b4cade09 !important;
+  border: 1px solid #b4cade1d !important;
+  font-size: 11px;
+}
+.badge-token svg {
+  flex: none;
+  width: 19px;
+  height: 19px;
+}
+.badge-token span {
+  font-size: 11px !important;
+}
+.badge-bug_hunter {
+  color: #94dcb7;
+}
+.badge-nimb_team {
+  color: #91c7ef;
+}
+.badge-beta_tester {
+  color: #c6aff0;
+}
+.badge-plus {
+  color: #edcf97;
+}
+.identity-manage-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  margin: 16px 0;
+  background: #e8c5890e;
+  border: 1px solid #e8c5892b;
+  border-radius: 12px;
+  color: #e8cc9b;
+  text-align: left;
+}
+.identity-manage-button span {
+  flex: 1;
+}
+.identity-manager {
+  max-height: 70dvh;
+  overflow: auto;
+  padding-right: 3px;
+}
+.identity-manager > p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+.identity-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.identity-option > div {
+  flex: 1;
+  min-width: 0;
+}
+.identity-option strong {
+  color: var(--text);
+  font-size: 13px;
+}
+.identity-option small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.identity-option > button {
+  flex: none;
+  padding: 10px 14px;
+  min-height: 40px;
+  font-size: 12px;
+}
+.identity-symbol {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  flex: none;
+  background: #ffffff04;
+}
+.identity-history {
+  padding-top: 16px;
+}
+.identity-history h3 {
+  font-size: 13px;
+}
+.identity-history > div {
+  display: grid;
+  gap: 5px;
+  padding: 9px 0;
+  color: var(--secondary);
+  font-size: 12px;
+}
+.identity-history small {
+  color: var(--muted);
+}
+.plus-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.plus-heading h2 {
+  margin: 4px 0;
+}
+.plus-emblem {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #eed7ad, #c3a473);
+  color: #29251c;
+  box-shadow: 0 8px 28px #dfba7d19;
+}
+.identity-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 160px;
+  border: 1px solid color-mix(in srgb, var(--profile-color) 25%, transparent);
+  border-radius: 16px;
+  margin: 14px 0;
+  background:
+    radial-gradient(
+      ellipse at 90% 0,
+      color-mix(in srgb, var(--profile-color) 22%, transparent),
+      transparent 65%
+    ),
+    #142231;
+}
+.identity-preview .user-name {
+  font-size: 25px;
+  max-width: 90%;
+}
+.identity-preview small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.preview-orbit {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border: 1px solid color-mix(in srgb, var(--profile-color) 20%, transparent);
+  border-radius: 50%;
+  right: -45px;
+  top: -35px;
+  z-index: -1;
+}
+.accent-picker {
+  border: 0;
+  padding: 0;
+  margin: 6px 0 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.accent-picker legend {
+  margin-bottom: 12px;
+}
+.accent-picker button {
+  display: grid;
+  place-items: center;
+  background: var(--profile-color);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid #172637;
+  color: #172637;
+}
+.accent-picker button[aria-pressed="true"] {
+  outline: 2px solid var(--profile-color);
+  outline-offset: 2px;
+}
+.plus-locked {
+  padding: 30px 20px;
+  text-align: center;
+  border: 1px solid #dabe8628;
+  border-radius: 16px;
+  background: linear-gradient(140deg, #dabe8610, #223145);
+}
+.plus-locked > svg {
+  color: var(--accent);
+}
+.plus-locked p {
+  max-width: 400px;
+  margin: 12px auto;
+}
+@media (max-width: 760px) {
+  .shell,
+  .auth {
+    background-size: 1250px auto;
+    background-position: 45% top;
+  }
+  .conversation-list {
+    background: linear-gradient(180deg, #1b2936d6, #14202ce8);
+  }
+  .composer input,
+  .security-form input,
+  .preference-form select,
+  .wallet-form input,
+  .settings-search input,
+  .search-box input,
+  .auth-form input {
+    font-size: 16px;
+  }
+  .composer-wrap {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .bubble {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .identity-option {
+    gap: 10px;
+  }
+  .identity-symbol {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  .identity-option > button {
+    padding: 10px;
+    font-size: 11px;
+  }
+  .badge-token {
+    padding: 8px 10px !important;
+  }
+  .badge-token span {
+    font-size: 10px !important;
+  }
+}
+
+/* Text size in Settings must affect content whose base size is in pixels. */
+.bubble,
+.post-text,
+.profile-bio {
+  font-size: calc(14px * var(--font-scale, 1));
+}
+@media (max-width: 760px) {
+  .composer input {
+    font-size: calc(16px * max(1, var(--font-scale, 1)));
+  }
+}
+
+.control-shortcuts.with-identity {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .control-shortcuts.with-identity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,3 +1,4 @@
+import { IdentityManager, UserName, type Identity } from "./Identity";
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,7 +24,7 @@ import {
 import { Dialog, useConfirmation } from "./UI";
 import "./admin.css";
 
-type User = {
+type User = Identity & {
   id: number;
   name: string;
   username: string;
@@ -60,7 +61,7 @@ type GiftTemplate = {
 };
 type Operation = {
   id: string;
-  kind: GrantKind;
+  kind: GrantKind | "identity";
   label: string;
   value: string;
   createdAt: string;
@@ -83,7 +84,7 @@ const actions = {
   },
   username: {
     title: "Выдать юзернейм",
-    description: "Закрепить особенный номер",
+    description: "Закрепить имя или номер",
     icon: AtSign,
     button: "Выдать юзернейм",
   },
@@ -181,7 +182,8 @@ function Operations({
   return (
     <div className={`control-operations ${compact ? "compact" : ""}`}>
       {events.map((event) => {
-        const Icon = actions[event.kind].icon;
+        const Icon =
+          event.kind === "identity" ? ShieldCheck : actions[event.kind].icon;
         return (
           <div className="control-operation" key={event.id}>
             <span className={`control-symbol ${event.kind}`}>
@@ -263,7 +265,7 @@ function GrantDialog({
           ? `${number(Number(value))} нимбиков начислено @${user!.username}`
           : kind === "gift"
             ? `Подарок «${chosenGift?.name}» отправлен @${user!.username}`
-            : `@${value} добавлен в коллекцию @${user!.username}`,
+            : `${value.startsWith("+") ? value : "@" + value} добавлен в коллекцию @${user!.username}`,
       ),
   });
   function submit(e: React.FormEvent) {
@@ -278,8 +280,15 @@ function GrantDialog({
       setValidation("Введите целое число от 1 до 1 000 000.");
       return;
     }
-    if (kind === "username" && !/^[1-9][0-9]{0,5}$/.test(value)) {
-      setValidation("От 1 до 6 цифр, без нуля в начале.");
+    if (
+      kind === "username" &&
+      !/^(?:[1-9][0-9]{0,5}|[a-z][a-z0-9_]{2,23}|\+[1-9][0-9]{2,11})$/.test(
+        value,
+      )
+    ) {
+      setValidation(
+        "Имя: 3–24 латинских символа. Числовое имя: 1–6 цифр. Номер: + и 3–12 цифр.",
+      );
       return;
     }
     if (kind === "gift" && !chosenGift) {
@@ -308,7 +317,9 @@ function GrantDialog({
           <div className="control-recipient">
             <Portrait user={user} />
             <span>
-              <strong>{user.name}</strong>
+              <strong>
+                <UserName user={user} />
+              </strong>
               <small>
                 @{user.username} · ID {user.id}
               </small>
@@ -377,14 +388,16 @@ function GrantDialog({
               {kind === "currency"
                 ? `+${number(Number(value))}`
                 : kind === "username"
-                  ? `@${value}`
+                  ? value.startsWith("+")
+                    ? value
+                    : `@${value}`
                   : chosenGift?.icon}
             </strong>
             <span>
               {kind === "currency"
                 ? "нимбиков на баланс"
                 : kind === "username"
-                  ? "в коллекцию юзернеймов"
+                  ? "в коллекцию"
                   : chosenGift?.name}
             </span>
             <p>
@@ -467,20 +480,19 @@ function GrantDialog({
             {kind === "username" && (
               <>
                 <label className="control-field">
-                  Числовой юзернейм
+                  Юзернейм или номер
                   <div className="control-amount-input">
                     <AtSign size={23} />
                     <input
                       autoFocus
-                      aria-label="Числовой юзернейм"
+                      aria-label="Юзернейм или номер"
                       placeholder="777"
-                      inputMode="numeric"
-                      pattern="[1-9][0-9]{0,5}"
-                      maxLength={6}
+                      autoCapitalize="none"
+                      maxLength={24}
                       required
                       value={value}
                       onChange={(e) =>
-                        setValue(e.target.value.replace(/^@/, ""))
+                        setValue(e.target.value.toLowerCase().replace(/^@/, ""))
                       }
                     />
                   </div>
@@ -545,7 +557,8 @@ function GrantDialog({
     </Dialog>
   );
 }
-export function Admin() {
+export function Admin({ owner = false }: { owner?: boolean }) {
+  const [identityUser, setIdentityUser] = useState<number | null>(null);
   const [tab, setTab] = useState<"users" | "reports" | "activity">("users");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -823,7 +836,7 @@ export function Admin() {
           </small>
         </button>
       </div>
-      <div className="control-shortcuts">
+      <div className={"control-shortcuts" + (owner ? " with-identity" : "")}>
         {(Object.keys(actions) as GrantKind[]).map((kind) => {
           const item = actions[kind],
             Icon = item.icon;
@@ -843,6 +856,25 @@ export function Admin() {
             </button>
           );
         })}
+        {owner && (
+          <button
+            disabled={!selected}
+            onClick={() => selected && setIdentityUser(selected.id)}
+          >
+            <span className="control-symbol username">
+              <ShieldCheck size={22} />
+            </span>
+            <span>
+              <strong>Значки и Plus</strong>
+              <small>
+                {selected
+                  ? `Для @${selected.username}`
+                  : "Выберите пользователя"}
+              </small>
+            </span>
+            <ArrowUpRight size={18} />
+          </button>
+        )}
       </div>
       <nav className="control-tabs" aria-label="Разделы админ-панели">
         {(
@@ -966,7 +998,7 @@ export function Admin() {
                         <Portrait user={user} />
                         <span>
                           <strong>
-                            {user.name}
+                            <UserName user={user} />
                             {user.isAdmin && <ShieldCheck size={12} />}
                           </strong>
                           <small>
@@ -1088,7 +1120,9 @@ export function Admin() {
               <>
                 <div className="control-person">
                   <Portrait user={selected} />
-                  <h2>{selected.name}</h2>
+                  <h2>
+                    <UserName user={selected} />
+                  </h2>
                   <p>
                     @{selected.username} <span>· ID {selected.id}</span>
                   </p>
@@ -1130,6 +1164,16 @@ export function Admin() {
                     <ChevronRight size={15} />
                   </button>
                 </div>
+                {owner && (
+                  <button
+                    className="identity-manage-button"
+                    onClick={() => setIdentityUser(selected.id)}
+                  >
+                    <ShieldCheck size={19} />
+                    <span>Значки, галочка и Plus</span>
+                    <ChevronRight size={16} />
+                  </button>
+                )}
                 <dl className="control-person-meta">
                   <div>
                     <dt>В nimb с</dt>
@@ -1149,7 +1193,11 @@ export function Admin() {
                 {!!detail.data?.user.purchasedUsernames.length && (
                   <div className="control-owned-names">
                     {detail.data.user.purchasedUsernames.map((n) => (
-                      <span key={n.username}>@{n.username}</span>
+                      <span key={n.username}>
+                        {n.username.startsWith("+")
+                          ? n.username
+                          : "@" + n.username}
+                      </span>
                     ))}
                   </div>
                 )}
@@ -1300,6 +1348,12 @@ export function Admin() {
         <Failure
           message={catalog.error.message}
           retry={() => catalog.refetch()}
+        />
+      )}
+      {identityUser !== null && (
+        <IdentityManager
+          userId={identityUser}
+          onClose={() => setIdentityUser(null)}
         />
       )}
       {grant && (

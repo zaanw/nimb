@@ -232,14 +232,14 @@ test("username conflict stays in dialog and lets the admin correct the name", as
     .getByRole("button", { name: "Выдать юзернейм пользователю @test" })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Числовой юзернейм").fill("77");
+  await dialog.getByLabel("Юзернейм или номер").fill("77");
   await dialog.getByRole("button", { name: "Продолжить" }).click();
   await dialog
     .getByRole("button", { name: "Выдать юзернейм", exact: true })
     .click();
   await expect(dialog.getByRole("alert")).toContainText("уже занят");
   await dialog.getByRole("button", { name: "Назад", exact: true }).click();
-  await dialog.getByLabel("Числовой юзернейм").fill("888");
+  await dialog.getByLabel("Юзернейм или номер").fill("888");
   await dialog.getByRole("button", { name: "Продолжить" }).click();
   await dialog
     .getByRole("button", { name: "Выдать юзернейм", exact: true })

@@ -1,3 +1,4 @@
+import { UserName, type Identity } from "./Identity";
 import { Brand, PageHeading, useConfirmation } from "./UI";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -19,7 +20,7 @@ import {
   Hash,
   SquarePen,
 } from "lucide-react";
-type User = {
+type User = Identity & {
   id: number;
   username: string;
   name: string;
@@ -68,7 +69,9 @@ function Name({ user, onOpen }: { user: User; onOpen: (u: User) => void }) {
         )}
       </span>
       <span>
-        <strong>{user.name}</strong>
+        <strong>
+          <UserName user={user} />
+        </strong>
         <small>@{user.username}</small>
       </span>
     </button>
@@ -269,7 +272,9 @@ export function Feed({
                 )}
               </span>
               <div className="post-compose-identity">
-                <strong>{me.name}</strong>
+                <strong>
+                  <UserName user={me} />
+                </strong>
                 <small>@{me.username}</small>
               </div>
             </div>
@@ -425,7 +430,9 @@ export function Feed({
                   )}
                 </span>
                 <span>
-                  <strong>{me.name}</strong>
+                  <strong>
+                    <UserName user={me} />
+                  </strong>
                   <small>@{me.username}</small>
                 </span>
               </div>

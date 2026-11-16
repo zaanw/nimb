@@ -1,3 +1,4 @@
+import {identitySelect, collectibleName, collectiblePrice, lockName, registerIdentity} from './identity.js';
 import dotenv from 'dotenv';
 dotenv.config({path:new URL('../../../.env', import.meta.url).pathname});
 import Fastify from 'fastify';
@@ -45,7 +46,7 @@ const bucket=process.env.S3_BUCKET||'nimb';
 const storage=new S3Client({endpoint:process.env.S3_ENDPOINT||'http://localhost:9000',region:process.env.S3_REGION||'us-east-1',forcePathStyle:true,requestChecksumCalculation:'WHEN_REQUIRED',responseChecksumValidation:'WHEN_REQUIRED',credentials:{accessKeyId:process.env.S3_ACCESS_KEY||'nimbminio',secretAccessKey:process.env.S3_SECRET_KEY||'nimbminio-local-only'}});
 let bucketReady=false;
 async function ensureBucket(){if(bucketReady)return;try{await storage.send(new HeadBucketCommand({Bucket:bucket}))}catch(e){if(process.env.S3_CREATE_BUCKET!=='true')throw e;await storage.send(new CreateBucketCommand({Bucket:bucket}))}bucketReady=true;}
-const publicUser = {id:true, username:true, name:true, bio:true, bioPrivate:true, onlineVisible:true, links:true, hasAvatar:true, hasBanner:true, mediaVersion:true, hasMusic:true, hasMusicCover:true, musicTitle:true, musicArtist:true, musicVersion:true, createdAt:true} as const;
+const publicUser = {...identitySelect,id:true, username:true, name:true, bio:true, bioPrivate:true, onlineVisible:true, links:true, hasAvatar:true, hasBanner:true, mediaVersion:true, hasMusic:true, hasMusicCover:true, musicTitle:true, musicArtist:true, musicVersion:true, createdAt:true} as const;
 const digest = (s:string) => createHash('sha256').update(s).digest('hex');
 async function session(token?:string) {
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
@@ -77,7 +78,8 @@ app.setErrorHandler((err, _req, reply) => {
 app.get('/api/health',async(_req,reply)=>{try{await db.$queryRaw`SELECT 1`;return {ok:true}}catch{return reply.code(503).send({ok:false})}});
 app.post('/api/register', {config:{rateLimit:{max:5,timeWindow:'1 minute'}}}, async (req, reply) => {
   const data=account.parse(req.body); if(/^\d+$/.test(data.username))return reply.code(400).send({error:'Числовые имена доступны в кошельке'}); const passwordHash=await argon2.hash(data.password,{type:argon2.argon2id});
-  const user=await db.user.create({data:{username:data.username, name:data.name, passwordHash},select:publicUser});
+  const user=await db.$transaction(async tx=>{await lockName(tx,data.username);if(await tx.usernamePurchase.findUnique({where:{username:data.username}}))return null;return tx.user.create({data:{username:data.username, name:data.name, passwordHash},select:publicUser})});
+  if(!user)return reply.code(409).send({error:'Это имя уже принадлежит другому пользователю'});
   if(user.id<=100)await db.badgeAward.upsert({where:{userId_badge:{userId:user.id,badge:'early'}},create:{userId:user.id,badge:'early'},update:{}});
   await setSession(user.id,reply); return {user};
 });
@@ -95,7 +97,7 @@ app.post('/api/reset-password',{config:{rateLimit:{max:10,timeWindow:'1 minute'}
 app.post('/api/logout',async(req,reply)=>{const s=await auth(req,reply);if(!s)return; await db.session.deleteMany({where:{id:s.id}}); for (const socket of (await io.in(`user:${s.userId}`).fetchSockets())) if (socket.data.sessionId === s.id) socket.disconnect(true); reply.clearCookie('nimb_session',{path:'/'}); return {ok:true};});
 const adminIds=new Set([1,...(process.env.ADMIN_USER_IDS||'').split(',').map(x=>Number(x.trim())).filter(x=>Number.isSafeInteger(x)&&x>0)]);
 async function adminAuth(req:any,reply:any){const s=await auth(req,reply);if(!s)return null;if(!adminIds.has(s.userId)){reply.code(403).send({error:'Доступ запрещён'});return null}return s;}
-const adminUserSelect = {id:true,username:true,name:true,createdAt:true,suspended:true,nimbBalance:true,hasAvatar:true,mediaVersion:true} as const;
+const adminUserSelect = {...identitySelect,id:true,username:true,name:true,createdAt:true,suspended:true,nimbBalance:true,hasAvatar:true,mediaVersion:true} as const;
 app.get('/api/admin/overview', async(req,reply) => {
   if(!await adminAuth(req,reply)) return;
   const [users,communities,openReports,newUsers,balance,giftCount] = await Promise.all([
@@ -129,15 +131,17 @@ app.get('/api/admin/activity', async(req,reply) => {
   if(!await adminAuth(req,reply)) return;
   const {userId}=z.object({userId:z.coerce.number().int().positive().optional()}).parse(req.query);
   const who={id:true,username:true,name:true} as const;
-  const [currency,presents,names]=await Promise.all([
+  const [currency,presents,names,identity]=await Promise.all([
     db.currencyGrant.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
     db.giftEvent.findMany({where:userId?{gift:{ownerId:userId}}:{},orderBy:{id:'desc'},take:50,include:{sender:{select:who},gift:{select:{template:true,owner:{select:who}}}}}),
     db.usernamePurchase.findMany({where:userId?{ownerId:userId}:{},orderBy:{id:'desc'},take:50,include:{owner:{select:who},grantedBy:{select:who}}}),
+    db.identityGrant.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
   ]);
   const events=[
     ...currency.map(e=>({id:'currency-'+e.id,kind:'currency',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:'Начисление нимбиков',value:'+'+e.amount.toLocaleString('ru-RU')})),
     ...presents.map(e=>({id:'gift-'+e.id,kind:'gift',createdAt:e.createdAt,user:e.gift.owner,actor:e.sender,label:'Подарок',value:gifts[e.gift.template as keyof typeof gifts]?.name||e.gift.template})),
-    ...names.map(e=>({id:'username-'+e.id,kind:'username',createdAt:e.purchasedAt,user:e.owner,actor:e.grantedBy,label:e.price===0?'Выдача юзернейма':'Покупка юзернейма',value:'@'+e.username})),
+    ...names.map(e=>({id:'username-'+e.id,kind:'username',createdAt:e.purchasedAt,user:e.owner,actor:e.grantedBy,label:e.username.startsWith('+')?(e.price===0?'Выдача номера':'Покупка номера'):(e.price===0?'Выдача юзернейма':'Покупка юзернейма'),value:e.username.startsWith('+')?e.username:'@'+e.username})),
+    ...identity.map(e=>({id:'identity-'+e.id,kind:'identity',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:e.enabled?'Выдача привилегии':'Отзыв привилегии',value:e.kind==='verified'?'Верификация':badges[e.kind]?.name||e.kind})),
   ].sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.id.localeCompare(a.id)).slice(0,50);
   return {events};
 });
@@ -145,8 +149,9 @@ app.post('/api/admin/users/:id/username', {config:{rateLimit:{max:30,timeWindow:
   const actor=await adminAuth(req,reply);
   if(!actor) return;
   const id=z.coerce.number().int().positive().parse((req.params as any).id);
-  const {username}=z.object({username:z.string().regex(/^[1-9][0-9]{0,5}$/)}).parse(req.body);
+  const {username}=z.object({username:collectibleName}).parse(req.body);
   const result=await db.$transaction(async tx=>{
+    await lockName(tx,username);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
     if(!await tx.user.findUnique({where:{id},select:{id:true}}))return 'missing';
     if(await tx.usernamePurchase.findUnique({where:{username}})||await tx.user.findUnique({where:{username},select:{id:true}}))return 'taken';
@@ -181,7 +186,7 @@ app.put('/api/me/music/cover',{config:{rateLimit:{max:10,timeWindow:'1 minute'}}
 app.delete('/api/me/music/cover',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const previous=await db.user.findUniqueOrThrow({where:{id:s.userId},select:{musicCoverKey:true}});const user=await db.user.update({where:{id:s.userId},data:{musicCoverKey:null,hasMusicCover:false,musicVersion:{increment:1}},select:publicUser});if(previous.musicCoverKey)await storage.send(new DeleteObjectCommand({Bucket:bucket,Key:previous.musicCoverKey})).catch(err=>app.log.error(err));await announceProfile(s.userId);return {user};});
 app.get('/api/users/:id/music/cover',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);if(await blocked(id,s.userId))return reply.code(404).send({error:'Обложка не найдена'});const user=await db.user.findUnique({where:{id},select:{musicCoverKey:true}});if(!user?.musicCoverKey)return reply.code(404).send({error:'Обложка не найдена'});await ensureBucket();const object=await storage.send(new GetObjectCommand({Bucket:bucket,Key:user.musicCoverKey}));return reply.header('Content-Type','image/webp').header('X-Content-Type-Options','nosniff').header('Cache-Control','private, no-cache').send(object.Body);});
 app.get('/api/users/:id/music',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);if(await blocked(id,s.userId))return reply.code(404).send({error:'Трек не найден'});const user=await db.user.findUnique({where:{id},select:{musicKey:true,musicMime:true}});if(!user?.musicKey)return reply.code(404).send({error:'Трек не найден'});const range=req.headers.range;if(range&&!/^bytes=\d+-\d*$/.test(range))return reply.code(416).send({error:'Недопустимый диапазон'});await ensureBucket();const obj=await storage.send(new GetObjectCommand({Bucket:bucket,Key:user.musicKey,...(range?{Range:range}:{})}));reply.header('Content-Type',user.musicMime||'audio/mpeg').header('X-Content-Type-Options','nosniff').header('Cache-Control','private, no-store').header('Accept-Ranges','bytes');if(obj.ContentRange)reply.code(206).header('Content-Range',obj.ContentRange);if(obj.ContentLength!==undefined)reply.header('Content-Length',obj.ContentLength);return reply.send(obj.Body);});
-app.get('/api/users',async(req,reply)=>{const s=await auth(req,reply);if(!s)return; const {q}=z.object({q:z.string().trim().min(1).max(50)}).parse(req.query);const term=q.startsWith('@')?q.slice(1).trim():q;if(!term)return {users:[]};return {users:await db.user.findMany({where:{id:{not:s.userId},OR:[{username:{contains:term.toLowerCase()}},{name:{contains:term,mode:'insensitive'}}]},select:publicUser,take:20})};});
+app.get('/api/users',async(req,reply)=>{const s=await auth(req,reply);if(!s)return; const {q}=z.object({q:z.string().trim().min(1).max(50)}).parse(req.query);const term=q.startsWith('@')?q.slice(1).trim():q;if(!term)return {users:[]};return {users:await db.user.findMany({where:{id:{not:s.userId},OR:[{username:{contains:term.toLowerCase()}},{collectibleNumber:{contains:term}},{name:{contains:term,mode:'insensitive'}}]},select:publicUser,take:20})};});
 app.get('/api/users/:id',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const user=await db.user.findUnique({where:{id},select:publicUser});if(!user)return reply.code(404).send({error:'Пользователь не найден'});return {user};});
 app.post('/api/chats',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const {userId}=z.object({userId:z.number().int().positive()}).parse(req.body);if(userId===s.userId)return reply.code(400).send({error:'Нельзя создать чат с собой'});if(!await db.user.findUnique({where:{id:userId}}))return reply.code(404).send({error:'Пользователь не найден'});if(!await canDirectMessage(s.userId,userId))return reply.code(403).send({error:'Общение с пользователем недоступно'});const pairKey=[s.userId,userId].sort((a,b)=>a-b).join(':'); const chat=await db.chat.upsert({where:{pairKey},update:{},create:{pairKey,members:{create:[{userId:s.userId},{userId}]}},include:{members:{include:{user:{select:publicUser}}},media:{select:{hasAvatar:true,hasBanner:true,version:true}}}});return {chat};});
 app.get('/api/chats',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const chats=await db.chat.findMany({where:{members:{some:{userId:s.userId}}},include:{members:{include:{user:{select:publicUser}}},media:{select:{hasAvatar:true,hasBanner:true,version:true}},messages:{orderBy:{id:'desc'},take:1}},orderBy:{id:'desc'}});return {chats};});
@@ -219,12 +224,27 @@ app.post('/api/posts/:id/comments',async(req,reply)=>{const s=await auth(req,rep
 app.patch('/api/messages/:id',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);const {text}=z.object({text:z.string().trim().min(1).max(4000)}).parse(req.body);const m=await db.message.findUnique({where:{id}});if(!m||m.senderId!==s.userId||!await member(m.chatId,s.userId))return reply.code(404).send({error:'Сообщение не найдено'});if(!await directInteractionAllowed(m.chatId,s.userId))return reply.code(403).send({error:'Общение с пользователем недоступно'});const message=await db.message.update({where:{id},data:{text,editedAt:new Date()},include:{replyTo:{select:{id:true,text:true,senderId:true}},reactions:true,attachment:{select:{id:true,name:true,mime:true,size:true}}}});await notifyChat(m.chatId,'message:update',message);return {message};});
 app.delete('/api/messages/:id',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);const m=await db.message.findUnique({where:{id},include:{attachment:true}});if(!m||m.senderId!==s.userId||!await member(m.chatId,s.userId))return reply.code(404).send({error:'Сообщение не найдено'});await db.message.delete({where:{id}});if(m.attachment)try{await storage.send(new DeleteObjectCommand({Bucket:bucket,Key:m.attachment.objectKey}))}catch(err){app.log.error(err)}await notifyChat(m.chatId,'message:delete',{id,chatId:m.chatId});return {ok:true};});
 
-const numericName=z.string().regex(/^[1-9][0-9]{0,5}$/, 'Введите число от 1 до 6 цифр без нулей в начале');
-const usernamePrice=(name:string)=>name.length===1?10000:name.length===2?5000:1000;
-app.get('/api/wallet',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const [user,owned]=await Promise.all([db.user.findUniqueOrThrow({where:{id:s.userId},select:{nimbBalance:true,username:true}}),db.usernamePurchase.findMany({where:{ownerId:s.userId},orderBy:{id:'desc'},select:{username:true,price:true,purchasedAt:true}})]);return {balance:user.nimbBalance,username:user.username,owned};});
-app.get('/api/wallet/check',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:numericName}).parse(req.query);const [used,purchase]=await Promise.all([db.user.findUnique({where:{username},select:{id:true}}),db.usernamePurchase.findUnique({where:{username},select:{ownerId:true}})]);return {username,price:usernamePrice(username),available:!used&&!purchase,owned:purchase?.ownerId===s.userId};});
-app.post('/api/wallet/buy', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:numericName}).parse(req.body);const price=usernamePrice(username);const result=await db.$transaction(async tx=>{await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;if(await tx.usernamePurchase.findUnique({where:{username}})||await tx.user.findUnique({where:{username},select:{id:true}}))return 'taken';const updated=await tx.user.updateMany({where:{id:s.userId,nimbBalance:{gte:price}},data:{nimbBalance:{decrement:price}}});if(!updated.count)return 'balance';await tx.usernamePurchase.create({data:{username,price,ownerId:s.userId}});await tx.user.update({where:{id:s.userId},data:{username}});return 'ok';});if(result==='taken')return reply.code(409).send({error:'Этот юзернейм уже занят'});if(result==='balance')return reply.code(400).send({error:'Недостаточно нимбиков'});await announceProfile(s.userId);return {ok:true};});
-app.post('/api/wallet/activate', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:numericName}).parse(req.body);const owned=await db.usernamePurchase.findFirst({where:{username,ownerId:s.userId}});if(!owned)return reply.code(404).send({error:'Этот юзернейм вам не принадлежит'});await db.user.update({where:{id:s.userId},data:{username}});await announceProfile(s.userId);return {ok:true};});
+registerIdentity(app,db,auth,announceProfile);
+app.get('/api/wallet',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const [user,owned]=await Promise.all([db.user.findUniqueOrThrow({where:{id:s.userId},select:{nimbBalance:true,username:true,collectibleNumber:true}}),db.usernamePurchase.findMany({where:{ownerId:s.userId},orderBy:{id:'desc'},select:{username:true,price:true,purchasedAt:true}})]);return {balance:user.nimbBalance,username:user.username,collectibleNumber:user.collectibleNumber,owned};});
+app.get('/api/wallet/check',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:collectibleName}).parse(req.query);const [used,purchase]=await Promise.all([db.user.findUnique({where:{username},select:{id:true}}),db.usernamePurchase.findUnique({where:{username},select:{ownerId:true}})]);return {username,price:collectiblePrice(username),available:!used&&!purchase,owned:purchase?.ownerId===s.userId};});
+app.post('/api/wallet/buy', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{
+  const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:collectibleName}).parse(req.body);const price=collectiblePrice(username);
+  const result=await db.$transaction(async tx=>{
+    await lockName(tx,username);await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;
+    if(await tx.usernamePurchase.findUnique({where:{username}})||await tx.user.findUnique({where:{username},select:{id:true}}))return 'taken';
+    const updated=await tx.user.updateMany({where:{id:s.userId,nimbBalance:{gte:price}},data:{nimbBalance:{decrement:price}}});if(!updated.count)return 'balance';
+    await tx.usernamePurchase.create({data:{username,price,ownerId:s.userId}});
+    await tx.user.update({where:{id:s.userId},data:username.startsWith('+')?{collectibleNumber:username}:{username}});return 'ok';
+  });
+  if(result==='taken')return reply.code(409).send({error:'Это имя или номер уже заняты'});if(result==='balance')return reply.code(400).send({error:'Недостаточно нимбиков'});
+  io.to(`user:${s.userId}`).emit('wallet:update');await announceProfile(s.userId);return {ok:true};
+});
+app.post('/api/wallet/activate', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{
+  const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:collectibleName}).parse(req.body);
+  const result=await db.$transaction(async tx=>{await lockName(tx,username);await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;if(!await tx.usernamePurchase.findFirst({where:{username,ownerId:s.userId}}))return false;await tx.user.update({where:{id:s.userId},data:username.startsWith('+')?{collectibleNumber:username}:{username}});return true});
+  if(!result)return reply.code(404).send({error:'Это имя или номер вам не принадлежат'});io.to(`user:${s.userId}`).emit('wallet:update');await announceProfile(s.userId);return {ok:true};
+});
+app.delete('/api/wallet/number',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;await db.$transaction(async tx=>{await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;await tx.user.update({where:{id:s.userId},data:{collectibleNumber:null}})});await announceProfile(s.userId);return {ok:true};});
 app.get('/api/catalog/gifts',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;return {templates:Object.entries(gifts).map(([id,value])=>({id,...value}))};});
 app.get('/api/users/:id/badges',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const userId=intId((req.params as any).id);if(!await db.user.findUnique({where:{id:userId}})||await blocked(s.userId,userId))return reply.code(404).send({error:'Пользователь не найден'});const awards=await db.badgeAward.findMany({where:{userId},orderBy:{awardedAt:'asc'}});return {badges:awards.filter(a=>badges[a.badge]).map(a=>({...badges[a.badge],id:a.badge,awardedAt:a.awardedAt}))};});
 app.get('/api/users/:id/gifts',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const userId=intId((req.params as any).id);if(!await db.user.findUnique({where:{id:userId}})||await blocked(s.userId,userId))return reply.code(404).send({error:'Пользователь не найден'});const owned=await db.gift.findMany({where:{ownerId:userId},orderBy:[{pinned:'desc'},{id:'desc'}],take:100,include:{events:{take:1,orderBy:{id:'asc'},include:{sender:{select:publicUser}}}}});return {gifts:owned.filter(g=>g.template in gifts).map(g=>({id:g.id,template:g.template,...gifts[g.template as keyof typeof gifts],pinned:g.pinned,receivedAt:g.receivedAt,ownerId:g.ownerId,sender:g.events[0]?.sender||null}))};});

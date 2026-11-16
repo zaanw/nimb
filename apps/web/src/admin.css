@@ -1657,37 +1657,6 @@
   }
 }
 
-/* Static SVG lighting is cheap to render on phones and never obstructs input. */
-.shell:has(.admin-console) {
-  background-color: #101923;
-  background-image: url("/admin-atmosphere.svg");
-  background-position: center top;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-.shell:has(.admin-console) > .sidebar {
-  background: linear-gradient(180deg, #18222de8, #121c27f5);
-  border-color: #b2c7dc16;
-}
-.shell:has(.admin-console) .sidebar button.active {
-  background: linear-gradient(100deg, #e8c58915, #e8c58905);
-  border-color: #e8c58924;
-}
-.shell:has(.admin-console) .sidebar button.active::before {
-  background: #e8c589;
-}
-.shell:has(.admin-console) .mobile-nav {
-  background: #172331ee;
-  border-color: #b2c7dc24;
-  box-shadow:
-    0 -8px 35px #050b1726,
-    inset 0 1px 0 #ffffff06;
-  backdrop-filter: blur(18px);
-}
-.shell:has(.admin-console) .mobile-nav button.active {
-  background: #d3b88d14;
-  color: #f1d4a8;
-}
 @media (min-width: 1101px) and (prefers-reduced-motion: no-preference) {
   .control-heading-art {
     animation: admin-light 14s ease-in-out infinite alternate;
@@ -1704,8 +1673,5 @@
   }
 }
 @media (max-width: 760px) {
-  .shell:has(.admin-console) {
-    background-size: 1250px auto;
-    background-position: 45% top;
-  }
+
 }

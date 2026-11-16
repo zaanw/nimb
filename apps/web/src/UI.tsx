@@ -67,6 +67,8 @@ export function Dialog({
     const node = panel.current;
     node?.focus();
     function key(e: KeyboardEvent) {
+      const dialogs = document.querySelectorAll('[role="dialog"]');
+      if (dialogs[dialogs.length - 1] !== node) return;
       if (e.key === "Escape") {
         e.preventDefault();
         closeRef.current();

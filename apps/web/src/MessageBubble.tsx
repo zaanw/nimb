@@ -1,3 +1,4 @@
+import { UserName, type Identity } from "./Identity";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { MoreHorizontal, Check, CheckCheck, Pin, Eye } from "lucide-react";
@@ -32,7 +33,7 @@ export function MessageBubble({
   me: number;
   read: boolean;
   showViews: boolean;
-  sender?: string;
+  sender?: string | Identity;
   canPin: boolean;
   onReply: (m: Message) => void;
   onForward: (m: Message) => void;
@@ -71,7 +72,11 @@ export function MessageBubble({
         animate={{ opacity: 1, y: 0 }}
         className="bubble"
       >
-        {sender && <strong className="message-author">{sender}</strong>}
+        {sender && (
+          <strong className="message-author">
+            {typeof sender === "string" ? sender : <UserName user={sender} />}
+          </strong>
+        )}
         {m.pinned && (
           <div className="message-pin">
             <Pin size={10} /> Закреплено

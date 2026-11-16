@@ -211,7 +211,7 @@ test("wallet requires confirmation and Escape cancels without purchasing", async
     .locator(".mobile-nav")
     .getByRole("button", { name: "Кошелёк", exact: true })
     .click();
-  await page.getByLabel("Числовой юзернейм").fill("777");
+  await page.getByLabel("Юзернейм или номер").fill("777");
   await page.getByRole("button", { name: "Проверить", exact: true }).click();
   await page.getByRole("button", { name: "Купить", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -225,7 +225,7 @@ test("wallet requires confirmation and Escape cancels without purchasing", async
     .getByRole("button", { name: "Купить юзернейм", exact: true })
     .click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Юзернейм обновлён" }),
+    page.getByRole("status").filter({ hasText: "Коллекция обновлена" }),
   ).toBeVisible();
   expect(state.purchases()).toBe(1);
 });
@@ -278,4 +278,58 @@ test("a delayed send cannot clear a draft in another conversation", async ({
   await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue(
     "Черновик другого чата",
   );
+});
+
+test("refresh restores the tab, settings page and selected conversation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page);
+  await page
+    .locator(".mobile-nav")
+    .getByRole("button", { name: "Лента", exact: true })
+    .click();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Лента", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator(".mobile-nav")
+    .getByRole("button", { name: "Настройки", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Шрифты", exact: true }).click();
+  await page.getByLabel("Размер текста").selectOption("large");
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Шрифты", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Размер текста")).toHaveValue("large");
+  await page
+    .locator(".mobile-nav")
+    .getByRole("button", { name: "Чаты", exact: true })
+    .click();
+  await page.locator(".chat-list-item").click();
+  await page.reload();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
+  await expect(page.locator(".chat-header")).toContainText("Собеседник");
+});
+
+test("stored navigation is scoped to the account and cannot expose admin", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "nimb_navigation_1",
+      JSON.stringify({ tab: "admin", setting: "Администрирование" }),
+    );
+    localStorage.setItem(
+      "nimb_navigation_999",
+      JSON.stringify({ tab: "wallet" }),
+    );
+  });
+  await fixture(page, false);
+  await expect(page.locator(".admin-console")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Сообщения", exact: true }),
+  ).toBeVisible();
 });

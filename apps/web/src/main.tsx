@@ -87,9 +87,11 @@ import {
 import { Admin } from "./Admin";
 import { InstallApp, useInstallApp } from "./InstallApp";
 import { Wallet } from "./Wallet";
+import { UserName, IdentitySettings, type Identity } from "./Identity";
+import "./theme.css";
 initializePreferences();
 
-type User = {
+type User = Identity & {
   id: number;
   username: string;
   name: string;
@@ -175,6 +177,7 @@ function App() {
     queryFn: () => api<{ user: User; isAdmin?: boolean }>("/me"),
     retry: false,
   });
+  const [restoredUser, setRestoredUser] = useState<number | null>(null);
   const [tab, setTab] = useState("chats");
   const [selected, setSelected] = useState<Chat | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
@@ -212,6 +215,83 @@ function App() {
     queryFn: () => api<{ chats: Chat[] }>("/chats"),
     enabled: !!me.data,
   });
+  useEffect(() => {
+    const id = me.data?.user.id;
+    if (!id || restoredUser === id) return;
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(`nimb_navigation_${id}`) || "{}",
+      );
+      if (
+        !location.search.includes("user=") &&
+        !location.search.includes("invite=")
+      ) {
+        const next = [
+          "chats",
+          "feed",
+          "profile",
+          "settings",
+          "wallet",
+          ...(me.data?.isAdmin ? ["admin"] : []),
+        ].includes(saved.tab)
+          ? saved.tab
+          : "chats";
+        if (next === "chats" && saved.chatId && !chats.data && !chats.isError)
+          return;
+        setTab(next);
+        setWalletOpen(next === "wallet");
+        const settings = [
+          "Аккаунт",
+          "Уведомления",
+          "Язык",
+          "Конфиденциальность",
+          "Устройства",
+          "Безопасность",
+          "Оформление",
+          "Шрифты",
+          "Папки с чатами",
+          "Производительность",
+          "Хранилище",
+          "О приложении",
+          "Установить приложение",
+          "nimb Plus",
+        ];
+        setSetting(
+          next === "settings" && settings.includes(saved.setting)
+            ? saved.setting
+            : "",
+        );
+        setSelected(
+          next === "chats"
+            ? chats.data?.chats.find((c) => c.id === saved.chatId) || null
+            : null,
+        );
+      }
+    } catch {
+      /* An unavailable or outdated storage must never prevent login. */
+    }
+    setRestoredUser(id);
+  }, [
+    me.data?.user.id,
+    me.data?.isAdmin,
+    chats.data,
+    chats.isError,
+    restoredUser,
+  ]);
+  useEffect(() => {
+    const id = me.data?.user.id;
+    if (!id || restoredUser !== id) return;
+    try {
+      localStorage.setItem(
+        `nimb_navigation_${id}`,
+        JSON.stringify({
+          tab: walletOpen ? "wallet" : tab,
+          setting,
+          chatId: selected?.id,
+        }),
+      );
+    } catch {}
+  }, [restoredUser, me.data?.user.id, tab, setting, selected?.id, walletOpen]);
   const users = useQuery({
     queryKey: ["users", search],
     queryFn: () =>
@@ -251,6 +331,10 @@ function App() {
       await qc.invalidateQueries({ queryKey: ["gifts"] });
     });
     socket.on("profile:update", (payload: { id: number }) => {
+      if (payload.id === me.data?.user.id) {
+        qc.invalidateQueries({ queryKey: ["me"] });
+        qc.invalidateQueries({ queryKey: ["wallet"] });
+      }
       qc.invalidateQueries({ queryKey: ["profile", payload.id] });
       qc.invalidateQueries({ queryKey: ["gifts", payload.id] });
       qc.invalidateQueries({ queryKey: ["badges", payload.id] });
@@ -534,7 +618,9 @@ function App() {
         <button className="side-bottom" onClick={() => nav("profile")}>
           <Avatar user={user} />
           <span>
-            <strong>{user.name}</strong>
+            <strong>
+              <UserName user={user} />
+            </strong>
             <small>@{user.username}</small>
           </span>
           <ChevronRight size={16} />
@@ -652,7 +738,9 @@ function App() {
                           >
                             <ChatAvatar chat={chat} user={person} />
                             <span className="item-copy">
-                              <strong>{person.name}</strong>
+                              <strong>
+                                <UserName user={person} />
+                              </strong>
                               <small>
                                 {chat.kind === "direct"
                                   ? "Личная переписка"
@@ -684,7 +772,9 @@ function App() {
                       >
                         <Avatar user={u} />
                         <span className="item-copy">
-                          <strong>{u.name}</strong>
+                          <strong>
+                            <UserName user={u} />
+                          </strong>
                           <small>@{u.username}</small>
                         </span>
                         <ChevronRight size={16} />
@@ -775,7 +865,9 @@ function App() {
                             )}
                           </span>
                           <span className="item-copy">
-                            <strong>{u.name}</strong>
+                            <strong>
+                              <UserName user={u} />
+                            </strong>
                             <small>
                               {typingChat === c.id
                                 ? "Печатает…"
@@ -888,7 +980,9 @@ function App() {
                       <ChatAvatar chat={currentChat} user={other} />
                     )}
                     <span>
-                      <strong>{other.name}</strong>
+                      <strong>
+                        <UserName user={other} />
+                      </strong>
                       <small>
                         {currentChat?.kind === "direct"
                           ? `@${other.username}${other.online === true ? " · в сети" : ""}`
@@ -1007,7 +1101,7 @@ function App() {
                           m.senderId !== user.id
                             ? currentChat?.members.find(
                                 (member) => member.user.id === m.senderId,
-                              )?.user.name || "Участник"
+                              )?.user || "Участник"
                             : undefined
                         }
                         canPin={
@@ -1152,7 +1246,7 @@ function App() {
             ) : tab === "feed" ? (
               <Feed me={user} onOpen={setProfile} onNavigate={nav} />
             ) : tab === "admin" && me.data.isAdmin ? (
-              <Admin />
+              <Admin owner={user.id === 1} />
             ) : (
               <>
                 <header className="settings-heading">
@@ -1173,7 +1267,12 @@ function App() {
                     {setting === "Установить приложение" ? (
                       <InstallApp {...installApp} />
                     ) : setting === "Администрирование" ? (
-                      <Admin />
+                      <Admin owner={user.id === 1} />
+                    ) : setting === "nimb Plus" ? (
+                      <IdentitySettings
+                        key={`${user.id}-${user.plus}`}
+                        user={user}
+                      />
                     ) : setting === "Аккаунт" ? (
                       <AccountSettings
                         edit={() => {
@@ -1207,8 +1306,7 @@ function App() {
                             ["me"],
                             (
                               old:
-                                | { user: User; isAdmin?: boolean }
-                                | undefined,
+                                { user: User; isAdmin?: boolean } | undefined,
                             ) => ({ ...old, user: u }),
                           )
                         }
@@ -1254,7 +1352,9 @@ function App() {
                     >
                       <Avatar user={user} />
                       <span>
-                        <strong>{user.name}</strong>
+                        <strong>
+                          <UserName user={user} />
+                        </strong>
                         <small>@{user.username}</small>
                       </span>
                       <ChevronRight size={18} />
@@ -1263,6 +1363,7 @@ function App() {
                       {[
                         [
                           ["Аккаунт", UserRound, "blue"],
+                          ["nimb Plus", Sparkles, "purple"],
                           ["Уведомления", Bell, "red"],
                         ],
                         [
@@ -1392,7 +1493,9 @@ function App() {
                   >
                     <ChatAvatar chat={c} user={target} />
                     <span className="item-copy">
-                      <strong>{target.name}</strong>
+                      <strong>
+                        <UserName user={target} />
+                      </strong>
                       <small>
                         {c.kind === "direct"
                           ? `@${target.username}`
@@ -1607,7 +1710,14 @@ function Profile({
     }
   }
   return (
-    <div className={"profile " + (own ? "own-profile" : "other-profile")}>
+    <div
+      className={
+        "profile accent-" +
+        (user.plus || user.id === 1 ? user.profileAccent || "gold" : "gold") +
+        " " +
+        (own ? "own-profile" : "other-profile")
+      }
+    >
       <PageHeading
         eyebrow={own ? "ЛИЧНОЕ" : "ПОЛЬЗОВАТЕЛЬ"}
         title={own ? "Мой профиль" : "Профиль"}
@@ -1641,7 +1751,9 @@ function Profile({
         <div className="profile-identity">
           <Avatar user={user} size="large" />
           <div className="profile-title">
-            <h1>{user.name}</h1>
+            <h1>
+              <UserName user={user} />
+            </h1>
             <span>@{user.username}</span>
             {user.online !== undefined && user.online !== null && (
               <small className="profile-status">
@@ -1686,6 +1798,13 @@ function Profile({
           <p className="muted profile-bio">Описание скрыто владельцем.</p>
         )}
         <div className="profile-meta">
+          {user.collectibleNumber && (
+            <span className="profile-number">
+              <Hash size={15} />
+              {user.collectibleNumber}
+              <small>номер nimb</small>
+            </span>
+          )}
           <span>
             <Hash size={15} /> ID {user.id}
           </span>
