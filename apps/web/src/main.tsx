@@ -177,7 +177,7 @@ function VerifiedName({user}:{user:User}) {
   const plus=awards.data?.badges.some(b=>b.id==="plus");
   return <span className="nimb-display-name">
     <span>{user.name}</span>
-    {verified&&<span className="nimb-verified" title="Проверено Nimb" aria-label="Проверено Nimb"><Check size={12} strokeWidth={3.4}/></span>}
+    {verified&&<span className="nimb-verified" title="Проверено Nimb" aria-label="Проверено Nimb"><svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><defs><mask id="nimb-verified-cutout"><rect width="32" height="32" fill="white"/><path d="M9.2 16.3l4.6 4.4 9-9.3" fill="none" stroke="black" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></mask></defs><path d="M16 1.7c2.3 0 3.5 2.6 5.4 3.1 1.9.5 4.6-1 6.2.6 1.6 1.6.1 4.3.6 6.2.5 1.9 3.1 3.1 3.1 5.4s-2.6 3.5-3.1 5.4c-.5 1.9 1 4.6-.6 6.2-1.6 1.6-4.3.1-6.2.6-1.9.5-3.1 3.1-5.4 3.1s-3.5-2.6-5.4-3.1c-1.9-.5-4.6 1-6.2-.6-1.6-1.6-.1-4.3-.6-6.2-.5-1.9-3.1-3.1-3.1-5.4s2.6-3.5 3.1-5.4c.5-1.9-1-4.6.6-6.2 1.6-1.6 4.3-.1 6.2-.6 1.9-.5 3.1-3.1 5.4-3.1Z" fill="white" mask="url(#nimb-verified-cutout)"/></svg></span>}
     {plus&&<span className="nimb-plus-mark" title="Nimb Plus">✦</span>}
   </span>;
 }
