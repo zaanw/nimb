@@ -212,6 +212,32 @@ function App() {
     queryFn: () => api<{ chats: Chat[] }>("/chats"),
     enabled: !!me.data,
   });
+  // Restore the last section and conversation for the signed-in account only.
+  const restoredFor = useRef<number | null>(null);
+  useEffect(() => {
+    const id=me.data?.user.id;
+    if(!id || restoredFor.current===id)return;
+    restoredFor.current=id;
+    try {
+      const saved=JSON.parse(localStorage.getItem(`nimb:nav:${id}`)||'{}') as {tab?:string;chatId?:number};
+      if(saved.tab && ['chats','feed','profile','settings'].includes(saved.tab))setTab(saved.tab);
+    } catch { /* Storage may be disabled. */ }
+  },[me.data?.user.id]);
+  useEffect(() => {
+    const id=me.data?.user.id;
+    if(!id || !chats.data || selected)return;
+    try {
+      const saved=JSON.parse(localStorage.getItem(`nimb:nav:${id}`)||'{}') as {chatId?:number};
+      const found=chats.data.chats.find(c=>c.id===saved.chatId);
+      if(found && tab==='chats')setSelected(found);
+    } catch { /* Ignore invalid local state. */ }
+  },[me.data?.user.id,chats.data]);
+  useEffect(() => {
+    const id=me.data?.user.id;
+    if(!id || restoredFor.current!==id)return;
+    try {localStorage.setItem(`nimb:nav:${id}`,JSON.stringify({tab,chatId:selected?.id??null}));}
+    catch { /* Private browsing may block storage. */ }
+  },[me.data?.user.id,tab,selected?.id]);
   const users = useQuery({
     queryKey: ["users", search],
     queryFn: () =>
