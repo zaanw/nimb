@@ -95,6 +95,25 @@ app.post('/api/reset-password',{config:{rateLimit:{max:10,timeWindow:'1 minute'}
 app.post('/api/logout',async(req,reply)=>{const s=await auth(req,reply);if(!s)return; await db.session.deleteMany({where:{id:s.id}}); for (const socket of (await io.in(`user:${s.userId}`).fetchSockets())) if (socket.data.sessionId === s.id) socket.disconnect(true); reply.clearCookie('nimb_session',{path:'/'}); return {ok:true};});
 const adminIds=new Set([1,...(process.env.ADMIN_USER_IDS||'').split(',').map(x=>Number(x.trim())).filter(x=>Number.isSafeInteger(x)&&x>0)]);
 async function adminAuth(req:any,reply:any){const s=await auth(req,reply);if(!s)return null;if(!adminIds.has(s.userId)){reply.code(403).send({error:'Доступ запрещён'});return null}return s;}
+// Only the owner may award or revoke identity and membership badges.
+// Configure NIMB_OWNER_USER_ID with the owner's existing numeric account ID.
+const ownerUserId = Number(process.env.NIMB_OWNER_USER_ID || '1');
+app.get('/api/admin/badges', async(req,reply)=>{
+  const actor=await adminAuth(req,reply);if(!actor)return;
+  if(actor.userId!==ownerUserId)return reply.code(403).send({error:'Только владелец Nimb может управлять значками'});
+  return {badges:Object.entries(badges).filter(([id])=>!['early','channel_author'].includes(id)).map(([id,info])=>({id,...info}))};
+});
+app.post('/api/admin/users/:id/badges',{config:{rateLimit:{max:20,timeWindow:'1 minute'}}},async(req,reply)=>{
+  const actor=await adminAuth(req,reply);if(!actor)return;
+  if(actor.userId!==ownerUserId)return reply.code(403).send({error:'Только владелец Nimb может выдавать значки'});
+  const id=intId((req.params as any).id);
+  const {badge,enabled}=z.object({badge:z.enum(['verified','bug_hunter','nimb_team','beta_tester','plus']),enabled:z.boolean()}).parse(req.body);
+  if(!await db.user.findUnique({where:{id},select:{id:true}}))return reply.code(404).send({error:'Пользователь не найден'});
+  if(enabled){await db.badgeAward.upsert({where:{userId_badge:{userId:id,badge}},create:{userId:id,badge},update:{}});}
+  else{await db.badgeAward.deleteMany({where:{userId:id,badge}});}
+  await announceProfile(id);
+  return {ok:true,badge,enabled};
+});
 const adminUserSelect = {id:true,username:true,name:true,createdAt:true,suspended:true,nimbBalance:true,hasAvatar:true,mediaVersion:true} as const;
 app.get('/api/admin/overview', async(req,reply) => {
   if(!await adminAuth(req,reply)) return;
