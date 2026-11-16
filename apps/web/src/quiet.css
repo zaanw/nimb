@@ -581,3 +581,159 @@
     font-size: 12px;
   }
 }
+
+.stat-rollback {
+  max-height: 72dvh;
+  overflow: auto;
+  padding-right: 5px;
+}
+.stat-rollback > p {
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.stat-rollback h3 {
+  font-size: 14px;
+  margin: 24px 0 13px;
+}
+.rollback-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 15px 0;
+}
+.rollback-stats > div {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  background: #14212d;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.rollback-stats span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.rollback-stats strong {
+  font-size: 19px;
+}
+.checkpoint-create {
+  display: grid;
+  gap: 12px;
+  margin: 25px 0;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.checkpoint-create label {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+}
+.checkpoint-create input {
+  padding: 11px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #14212d;
+  width: 100%;
+}
+.checkpoint-create button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.checkpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.checkpoint-row > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+.checkpoint-row strong {
+  font-size: 12px;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.checkpoint-row small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.checkpoint-row > span:last-child {
+  font-size: 10px;
+  color: var(--muted);
+}
+.rollback-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+.rollback-preview th,
+.rollback-preview td {
+  border-bottom: 1px solid var(--line-strong);
+  text-align: left;
+  padding: 10px 6px;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.rollback-preview th {
+  font-weight: 500;
+  color: var(--muted);
+}
+.rollback-preview p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.rollback-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.rollback-buttons button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stat-rollback .rollback-notice {
+  color: #accdb2;
+}
+@media (max-width: 760px) {
+  .checkpoint-create input {
+    font-size: 16px;
+  }
+  .rollback-preview th,
+  .rollback-preview td {
+    padding: 9px 4px;
+    font-size: 10px;
+  }
+  .rollback-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.rollback-clear-all {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 20px;
+  color: #e6b6ad;
+  border-color: #d0a09a40;
+}
+.rollback-clear-help {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 12px 0;
+}

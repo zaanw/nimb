@@ -131,6 +131,8 @@ async function adminFixture(page: Page) {
     else if (path === "/admin/activity") data = { events };
     else if (path === "/admin/reports") data = { reports };
     else if (path === "/catalog/gifts") data = { templates: gifts };
+    else if (/^\/users\/\d+\/badges$/.test(path)) data = { badges: [] };
+    else if (/^\/users\/\d+\/gifts$/.test(path)) data = { gifts: [] };
     await route.fulfill({
       status,
       contentType: "application/json",
@@ -317,4 +319,118 @@ test("admin, gift dialog and review fit phone, tablet and large desktop", async 
     await page.keyboard.press("Escape");
   }
   expect(errors).toEqual([]);
+});
+
+test("owner can save a point, preview a restore and cancel before applying", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await adminFixture(page);
+  const points = [
+    { id: 1, label: "Исходное состояние", createdAt: "2026-11-16T09:00:00Z" },
+  ];
+  let restores = 0;
+  let resets = 0;
+  await page.route("**/api/admin/users/2/checkpoints**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let data: any = { ok: true };
+    if (path.endsWith("/preview"))
+      data = {
+        point: points[0],
+        token: "a".repeat(64),
+        changes: {
+          balance: { before: 2500, after: 0 },
+          gifts: { before: 1, after: 0 },
+          names: { before: ["777"], after: [] },
+          badges: { before: ["bug_hunter"], after: [] },
+          plus: { before: true, after: false },
+          stats: {
+            before: { messages: 15, posts: 3 },
+            after: { messages: 2, posts: 1 },
+          },
+        },
+      };
+    else if (path.endsWith("/restore")) {
+      restores++;
+      data = { ok: true, backupId: 3 };
+      points.unshift({
+        id: 3,
+        label: "Перед откатом",
+        createdAt: "2026-11-16T10:00:00Z",
+      });
+    } else if (route.request().method() === "POST") {
+      points.unshift({
+        id: 2,
+        label: path.endsWith("/reset-all")?"Нулевые статы":route.request().postDataJSON().label,
+        createdAt: "2026-11-16T09:30:00Z",
+      });
+      data = { point: points[0] };
+    } else
+      data = {
+        points,
+        stats: {
+          messages: 15,
+          posts: 3,
+          comments: 0,
+          reactions: 1,
+          followers: 0,
+          following: 0,
+        },
+      };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(data),
+    });
+  });
+  await page.route("**/api/admin/users/2/stats/reset", async (route) => {
+    resets++;
+    await route.fulfill({
+      contentType: "application/json",
+      body: '{"ok":true}',
+    });
+  });
+  await page.getByRole("button", { name: "Откат статов", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Откат статов", exact: true });
+  await expect(panel).toBeVisible();
+  await panel.getByLabel("Сохранить текущее состояние").fill("Перед тестом");
+  await panel
+    .getByRole("button", { name: "Сохранить точку", exact: true })
+    .click();
+  await expect(panel.getByRole("status")).toContainText(
+    "Точка восстановления создана",
+  );
+  await panel
+    .locator(".checkpoint-row")
+    .filter({ hasText: "Исходное состояние" })
+    .click();
+  await expect(panel.locator("table")).toContainText("Нимбики");
+  await expect(panel.locator("table")).toContainText("2500");
+  await panel
+    .getByRole("button", { name: "Применить откат", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeVisible();
+  expect(restores).toBe(0);
+  await panel
+    .getByRole("button", { name: "Применить откат", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Применить откат?", exact: true })
+    .getByRole("button", { name: "Применить откат", exact: true })
+    .click();
+  await expect(panel.getByRole("status")).toContainText("Статы восстановлены");
+  expect(restores).toBe(1);
+  await panel
+    .getByRole("button", { name: "Обнулить счётчики", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  expect(resets).toBe(0);
+  await panel.getByRole('button',{name:'Обнулить все статы',exact:true}).click();await expect(panel.locator('table')).toContainText('Нимбики');expect(restores).toBe(1);
+  await panel.getByRole('button',{name:'Отмена',exact:true}).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({ path: "/tmp/nimb-stat-rollback-phone.png" });
 });

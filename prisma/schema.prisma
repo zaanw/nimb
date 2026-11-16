@@ -15,6 +15,11 @@ model User {
   onlineVisible Boolean @default(true)
   messagesFrom String @default("everyone")
   links Json @default("[]")
+  statsOffsets Json @default("{}")
+  statCheckpoints StatCheckpoint[] @relation("CheckpointUser")
+  statCheckpointsCreated StatCheckpoint[] @relation("CheckpointAdmin")
+  statRestores StatRestore[] @relation("RestoreUser")
+  statRestoresCreated StatRestore[] @relation("RestoreAdmin")
   savedMessages SavedMessage[]
   profileImages ProfileImage[]
   avatarKey String?
@@ -121,6 +126,7 @@ model Message {
   chat Chat @relation(fields:[chatId], references:[id], onDelete: Cascade)
   sender User @relation(fields:[senderId], references:[id], onDelete: Cascade)
   @@index([chatId,id])
+  @@index([senderId])
 }
 
 model Block {
@@ -152,6 +158,7 @@ model Post {
   comments Comment[]
   image PostImage?
   @@index([id, authorId])
+  @@index([authorId])
 }
 model PostLike {
   postId Int
@@ -169,6 +176,7 @@ model Comment {
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
   @@index([postId, id])
+  @@index([authorId])
 }
 model Follow {
   followerId Int
@@ -176,6 +184,7 @@ model Follow {
   follower User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
   following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
   @@id([followerId, followingId])
+  @@index([followingId])
 }
 
 model AuthToken {
@@ -194,6 +203,7 @@ model Reaction {
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@id([messageId, userId, emoji])
+  @@index([userId])
 }
 
 model Attachment {
@@ -344,4 +354,32 @@ model SavedMessage {
   message Message @relation(fields:[messageId], references:[id], onDelete:Cascade)
   @@unique([userId,messageId])
   @@index([userId,id])
+}
+
+model StatCheckpoint {
+ id Int @id @default(autoincrement())
+ userId Int
+ adminId Int
+ label String
+ state Json
+ createdAt DateTime @default(now())
+ user User @relation("CheckpointUser", fields:[userId], references:[id], onDelete:Cascade)
+ admin User @relation("CheckpointAdmin", fields:[adminId], references:[id], onDelete:Restrict)
+ restoredFrom StatRestore[] @relation("RestoreSource")
+ backups StatRestore[] @relation("RestoreBackup")
+ @@index([userId,id])
+}
+model StatRestore {
+ id Int @id @default(autoincrement())
+ userId Int
+ adminId Int
+ checkpointId Int
+ backupId Int
+ kind String
+ createdAt DateTime @default(now())
+ user User @relation("RestoreUser", fields:[userId], references:[id], onDelete:Cascade)
+ admin User @relation("RestoreAdmin", fields:[adminId], references:[id], onDelete:Restrict)
+ checkpoint StatCheckpoint @relation("RestoreSource", fields:[checkpointId], references:[id], onDelete:Restrict)
+ backup StatCheckpoint @relation("RestoreBackup", fields:[backupId], references:[id], onDelete:Restrict)
+ @@index([userId,id])
 }

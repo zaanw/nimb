@@ -1,3 +1,4 @@
+import {checkpoint,registerCheckpoints} from './checkpoints.js';
 import {registerMessenger} from './messenger.js';
 import {identitySelect, collectibleName, collectiblePrice, lockName, registerIdentity} from './identity.js';
 import dotenv from 'dotenv';
@@ -73,6 +74,7 @@ const account = z.object({username:z.string().regex(/^[a-zA-Z0-9_]{3,24}$/).tran
 app.setErrorHandler((err, _req, reply) => {
   if ((err as any).code === 'FST_REQ_FILE_TOO_LARGE') return reply.code(413).send({error:'Файл слишком большой. Выберите изображение до 5 МиБ.'});
   if (err instanceof ZodError) return reply.code(400).send({error:'Проверьте введённые данные'});
+  if ((err as any).code === 'P2034') return reply.code(409).send({error:'Данные изменились одновременно. Обновите предпросмотр и повторите действие.'});
   if ((err as any).code === 'P2002') return reply.code(409).send({error:'Имя пользователя уже занято'});
   if ((err as any).statusCode && (err as any).statusCode < 500) return reply.code((err as any).statusCode).send({error:(err as Error).message});
   app.log.error(err); return reply.code(500).send({error:'Ошибка сервера'});
@@ -133,17 +135,19 @@ app.get('/api/admin/activity', async(req,reply) => {
   if(!await adminAuth(req,reply)) return;
   const {userId}=z.object({userId:z.coerce.number().int().positive().optional()}).parse(req.query);
   const who={id:true,username:true,name:true} as const;
-  const [currency,presents,names,identity]=await Promise.all([
+  const [currency,presents,names,identity,restores]=await Promise.all([
     db.currencyGrant.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
     db.giftEvent.findMany({where:userId?{gift:{ownerId:userId}}:{},orderBy:{id:'desc'},take:50,include:{sender:{select:who},gift:{select:{template:true,owner:{select:who}}}}}),
     db.usernamePurchase.findMany({where:userId?{ownerId:userId}:{},orderBy:{id:'desc'},take:50,include:{owner:{select:who},grantedBy:{select:who}}}),
     db.identityGrant.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
+    db.statRestore.findMany({where:userId?{userId}:{},orderBy:{id:'desc'},take:50,include:{user:{select:who},admin:{select:who},checkpoint:{select:{label:true}}}}),
   ]);
   const events=[
     ...currency.map(e=>({id:'currency-'+e.id,kind:'currency',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:'Начисление нимбиков',value:'+'+e.amount.toLocaleString('ru-RU')})),
     ...presents.map(e=>({id:'gift-'+e.id,kind:'gift',createdAt:e.createdAt,user:e.gift.owner,actor:e.sender,label:'Подарок',value:gifts[e.gift.template as keyof typeof gifts]?.name||e.gift.template})),
     ...names.map(e=>({id:'username-'+e.id,kind:'username',createdAt:e.purchasedAt,user:e.owner,actor:e.grantedBy,label:e.username.startsWith('+')?(e.price===0?'Выдача номера':'Покупка номера'):(e.price===0?'Выдача юзернейма':'Покупка юзернейма'),value:e.username.startsWith('+')?e.username:'@'+e.username})),
     ...identity.map(e=>({id:'identity-'+e.id,kind:'identity',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:e.enabled?'Выдача привилегии':'Отзыв привилегии',value:e.kind==='verified'?'Верификация':badges[e.kind]?.name||e.kind})),
+    ...restores.map(e=>({id:'restore-'+e.id,kind:'identity',createdAt:e.createdAt,user:e.user,actor:e.admin,label:e.kind==='reset'?'Обнуление счётчиков':'Откат статов',value:e.checkpoint.label})),
   ].sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.id.localeCompare(a.id)).slice(0,50);
   return {events};
 });
@@ -157,6 +161,7 @@ app.post('/api/admin/users/:id/username', {config:{rateLimit:{max:30,timeWindow:
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
     if(!await tx.user.findUnique({where:{id},select:{id:true}}))return 'missing';
     if(await tx.usernamePurchase.findUnique({where:{username}})||await tx.user.findUnique({where:{username},select:{id:true}}))return 'taken';
+    await checkpoint(tx,id,actor.userId,'Перед выдачей адреса '+username);
     await tx.usernamePurchase.create({data:{username,price:0,ownerId:id,grantedById:actor.userId}});
     return 'ok';
   });
@@ -165,8 +170,8 @@ app.post('/api/admin/users/:id/username', {config:{rateLimit:{max:30,timeWindow:
   io.to(`user:${id}`).emit('wallet:update');
   return {ok:true,username};
 });
-app.post('/api/admin/users/:id/currency', {config:{rateLimit:{max:30,timeWindow:'1 minute'}}}, async(req,reply)=>{const actor=await adminAuth(req,reply);if(!actor)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const {amount}=z.object({amount:z.number().int().min(1).max(1000000)}).parse(req.body);const result=await db.$transaction(async tx=>{const updated=await tx.user.updateMany({where:{id,nimbBalance:{lte:2147483647-amount}},data:{nimbBalance:{increment:amount}}});if(!updated.count)return null;await tx.currencyGrant.create({data:{adminId:actor.userId,recipientId:id,amount}});return tx.user.findUniqueOrThrow({where:{id},select:{nimbBalance:true}})});if(!result)return reply.code(400).send({error:'Пользователь не найден или превышен максимальный баланс'});io.to(`user:${id}`).emit('wallet:update');return {balance:result.nimbBalance};});
-app.post('/api/admin/users/:id/gifts', {config:{rateLimit:{max:30,timeWindow:'1 minute'}}}, async(req,reply)=>{const actor=await adminAuth(req,reply);if(!actor)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const {template}=z.object({template:z.enum(['star','heart','flower','comet','moon','diamond'])}).parse(req.body);if(!await db.user.findUnique({where:{id},select:{id:true}}))return reply.code(404).send({error:'Пользователь не найден'});const gift=await db.gift.create({data:{ownerId:id,template,events:{create:{senderId:actor.userId}}}});io.to(`user:${id}`).emit('gift:new',{userId:id});return {gift:{id:gift.id}};});
+app.post('/api/admin/users/:id/currency', {config:{rateLimit:{max:30,timeWindow:'1 minute'}}}, async(req,reply)=>{const actor=await adminAuth(req,reply);if(!actor)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const {amount}=z.object({amount:z.number().int().min(1).max(1000000)}).parse(req.body);const result=await db.$transaction(async tx=>{await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;const prior=await tx.user.findUnique({where:{id},select:{nimbBalance:true}});if(!prior||prior.nimbBalance>2147483647-amount)return null;await checkpoint(tx,id,actor.userId,'Перед начислением '+amount+' нимбиков');const updated=await tx.user.updateMany({where:{id,nimbBalance:{lte:2147483647-amount}},data:{nimbBalance:{increment:amount}}});if(!updated.count)return null;await tx.currencyGrant.create({data:{adminId:actor.userId,recipientId:id,amount}});return tx.user.findUniqueOrThrow({where:{id},select:{nimbBalance:true}})});if(!result)return reply.code(400).send({error:'Пользователь не найден или превышен максимальный баланс'});io.to(`user:${id}`).emit('wallet:update');return {balance:result.nimbBalance};});
+app.post('/api/admin/users/:id/gifts', {config:{rateLimit:{max:30,timeWindow:'1 minute'}}}, async(req,reply)=>{const actor=await adminAuth(req,reply);if(!actor)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const {template}=z.object({template:z.enum(['star','heart','flower','comet','moon','diamond'])}).parse(req.body);if(!await db.user.findUnique({where:{id},select:{id:true}}))return reply.code(404).send({error:'Пользователь не найден'});const gift=await db.$transaction(async tx=>{await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;await checkpoint(tx,id,actor.userId,'Перед выдачей подарка');return tx.gift.create({data:{ownerId:id,template,events:{create:{senderId:actor.userId}}}})});io.to(`user:${id}`).emit('gift:new',{userId:id});return {gift:{id:gift.id}};});
 app.get('/api/admin/reports',async(req,reply)=>{
   if(!await adminAuth(req,reply))return;
   const reports=await db.report.findMany({where:{resolvedAt:null},select:{id:true,reason:true,createdAt:true,reporter:{select:{id:true,username:true,name:true}},reported:{select:{id:true,username:true,name:true,suspended:true}}},orderBy:{id:'desc'},take:100});
@@ -262,6 +267,7 @@ app.patch('/api/messages/:id',async(req,reply)=>{const s=await auth(req,reply);i
 app.delete('/api/messages/:id',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);const m=await db.message.findUnique({where:{id},include:{attachment:true}});if(!m||m.senderId!==s.userId||!await member(m.chatId,s.userId))return reply.code(404).send({error:'Сообщение не найдено'});await db.message.delete({where:{id}});if(m.attachment)try{await storage.send(new DeleteObjectCommand({Bucket:bucket,Key:m.attachment.objectKey}))}catch(err){app.log.error(err)}await notifyChat(m.chatId,'message:delete',{id,chatId:m.chatId});return {ok:true};});
 
 registerIdentity(app,db,auth,announceProfile);
+registerCheckpoints(app,db,auth,async id=>{io.to(`user:${id}`).emit('wallet:update');io.to(`user:${id}`).emit('gift:new',{userId:id});await announceProfile(id)});
 registerMessenger(app,db,auth,id=>io.to(`user:${id}`).emit('personal:update'));
 app.get('/api/wallet',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const [user,owned]=await Promise.all([db.user.findUniqueOrThrow({where:{id:s.userId},select:{nimbBalance:true,username:true,collectibleNumber:true}}),db.usernamePurchase.findMany({where:{ownerId:s.userId},orderBy:{id:'desc'},select:{username:true,price:true,purchasedAt:true,public:true}})]);return {balance:user.nimbBalance,username:user.username,collectibleNumber:user.collectibleNumber,owned};});
 app.patch('/api/wallet/visibility',async(req,reply)=>{
@@ -284,6 +290,8 @@ app.post('/api/wallet/buy', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},
   const result=await db.$transaction(async tx=>{
     await lockName(tx,username);await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;
     if(await tx.usernamePurchase.findUnique({where:{username}})||await tx.user.findUnique({where:{username},select:{id:true}}))return 'taken';
+    const buyer=await tx.user.findUniqueOrThrow({where:{id:s.userId},select:{nimbBalance:true}});if(buyer.nimbBalance<price)return 'balance';
+    await checkpoint(tx,s.userId,s.userId,'Перед покупкой '+username);
     const updated=await tx.user.updateMany({where:{id:s.userId,nimbBalance:{gte:price}},data:{nimbBalance:{decrement:price}}});if(!updated.count)return 'balance';
     await tx.usernamePurchase.create({data:{username,price,ownerId:s.userId}});
     await tx.user.update({where:{id:s.userId},data:username.startsWith('+')?{collectibleNumber:username}:{username}});return 'ok';
@@ -293,7 +301,7 @@ app.post('/api/wallet/buy', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},
 });
 app.post('/api/wallet/activate', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(req,reply)=>{
   const s=await auth(req,reply);if(!s)return;const {username}=z.object({username:collectibleName}).parse(req.body);
-  const result=await db.$transaction(async tx=>{await lockName(tx,username);await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;if(!await tx.usernamePurchase.findFirst({where:{username,ownerId:s.userId}}))return false;await tx.user.update({where:{id:s.userId},data:username.startsWith('+')?{collectibleNumber:username}:{username}});return true});
+  const result=await db.$transaction(async tx=>{await lockName(tx,username);await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;if(!await tx.usernamePurchase.findFirst({where:{username,ownerId:s.userId}}))return false;await checkpoint(tx,s.userId,s.userId,'Перед выбором адреса '+username);await tx.user.update({where:{id:s.userId},data:username.startsWith('+')?{collectibleNumber:username}:{username}});return true});
   if(!result)return reply.code(404).send({error:'Это имя или номер вам не принадлежат'});io.to(`user:${s.userId}`).emit('wallet:update');await announceProfile(s.userId);return {ok:true};
 });
 app.delete('/api/wallet/number',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;await db.$transaction(async tx=>{await tx.$executeRaw`SELECT pg_advisory_xact_lock(${s.userId})`;await tx.user.update({where:{id:s.userId},data:{collectibleNumber:null}})});await announceProfile(s.userId);return {ok:true};});

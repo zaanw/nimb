@@ -1,3 +1,4 @@
+import { checkpoint } from "./checkpoints.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -47,11 +48,9 @@ export function registerIdentity(
     const actor = await auth(req, reply);
     if (!actor) return;
     if (actor.userId !== 1)
-      return reply
-        .code(403)
-        .send({
-          error: "Значки, верификацию и Plus выдаёт только владелец nimb",
-        });
+      return reply.code(403).send({
+        error: "Значки, верификацию и Plus выдаёт только владелец nimb",
+      });
     const id = z.coerce
       .number()
       .int()
@@ -73,6 +72,12 @@ export function registerIdentity(
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${id})`;
       const user = await tx.user.findUnique({ where: { id } });
       if (!user) return false;
+      await checkpoint(
+        tx,
+        id,
+        actor.userId,
+        "Перед изменением привилегии " + kind,
+      );
       if (kind === "verified" || kind === "plus") {
         await tx.user.update({
           where: { id },
@@ -164,16 +169,20 @@ export function registerIdentity(
       });
       if (actor.userId !== 1 && !user.plus) return false;
       if (actor.userId !== 1 && data.nameEffect === "rainbow") return false;
+      await checkpoint(
+        tx,
+        actor.userId,
+        actor.userId,
+        "Перед изменением оформления",
+      );
       await tx.user.update({ where: { id: actor.userId }, data });
       return true;
     });
     if (!result)
-      return reply
-        .code(403)
-        .send({
-          error:
-            "Для персонализации нужен nimb Plus. Радужное имя доступно владельцу.",
-        });
+      return reply.code(403).send({
+        error:
+          "Для персонализации нужен nimb Plus. Радужное имя доступно владельцу.",
+      });
     await announce(actor.userId);
     return { ok: true };
   });

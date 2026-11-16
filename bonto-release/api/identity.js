@@ -1,3 +1,4 @@
+import { checkpoint } from "./checkpoints.js";
 import { z } from "zod";
 import { badges } from "./catalog.js";
 export const identitySelect = {
@@ -34,9 +35,7 @@ export function registerIdentity(app, db, auth, announce) {
         if (!actor)
             return;
         if (actor.userId !== 1)
-            return reply
-                .code(403)
-                .send({
+            return reply.code(403).send({
                 error: "Значки, верификацию и Plus выдаёт только владелец nimb",
             });
         const id = z.coerce
@@ -61,6 +60,7 @@ export function registerIdentity(app, db, auth, announce) {
             const user = await tx.user.findUnique({ where: { id } });
             if (!user)
                 return false;
+            await checkpoint(tx, id, actor.userId, "Перед изменением привилегии " + kind);
             if (kind === "verified" || kind === "plus") {
                 await tx.user.update({
                     where: { id },
@@ -155,13 +155,12 @@ export function registerIdentity(app, db, auth, announce) {
                 return false;
             if (actor.userId !== 1 && data.nameEffect === "rainbow")
                 return false;
+            await checkpoint(tx, actor.userId, actor.userId, "Перед изменением оформления");
             await tx.user.update({ where: { id: actor.userId }, data });
             return true;
         });
         if (!result)
-            return reply
-                .code(403)
-                .send({
+            return reply.code(403).send({
                 error: "Для персонализации нужен nimb Plus. Радужное имя доступно владельцу.",
             });
         await announce(actor.userId);

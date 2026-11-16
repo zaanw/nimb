@@ -1,3 +1,4 @@
+import { StatRollback } from "./StatRollback";
 import { IdentityManager, UserName, type Identity } from "./Identity";
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -558,6 +559,10 @@ function GrantDialog({
   );
 }
 export function Admin({ owner = false }: { owner?: boolean }) {
+  const [rollbackUser, setRollbackUser] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [identityUser, setIdentityUser] = useState<number | null>(null);
   const [tab, setTab] = useState<"users" | "reports" | "activity">("users");
   const [search, setSearch] = useState("");
@@ -1174,6 +1179,18 @@ export function Admin({ owner = false }: { owner?: boolean }) {
                     <ChevronRight size={16} />
                   </button>
                 )}
+                {owner && (
+                  <button
+                    className="identity-manage-button"
+                    onClick={() =>
+                      setRollbackUser({ id: selected.id, name: selected.name })
+                    }
+                  >
+                    <History size={19} />
+                    <span>Откат статов</span>
+                    <ChevronRight size={16} />
+                  </button>
+                )}
                 <dl className="control-person-meta">
                   <div>
                     <dt>В nimb с</dt>
@@ -1348,6 +1365,13 @@ export function Admin({ owner = false }: { owner?: boolean }) {
         <Failure
           message={catalog.error.message}
           retry={() => catalog.refetch()}
+        />
+      )}
+      {rollbackUser && (
+        <StatRollback
+          userId={rollbackUser.id}
+          name={rollbackUser.name}
+          onClose={() => setRollbackUser(null)}
         />
       )}
       {identityUser !== null && (
