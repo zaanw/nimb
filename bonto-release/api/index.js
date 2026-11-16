@@ -18,7 +18,7 @@ import multipart from '@fastify/multipart';
 import { S3Client, HeadBucketCommand, CreateBucketCommand, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
-import * as webpush from 'web-push';
+import { configureWebPush, deliverPush } from './webpush.js';
 import { z, ZodError } from 'zod';
 import { gifts, badges } from './catalog.js';
 import { isAllowedPushEndpoint, isAllowedSocialLink } from './policy.js';
@@ -44,14 +44,14 @@ app.addHook('onRequest', async (req, reply) => {
         return reply.code(403).send({ error: 'Недопустимый источник запроса' });
 });
 let pushReady = false;
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    try {
-        webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.test', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
-        pushReady = true;
-    }
-    catch (error) {
-        app.log.error(error, 'Неверные настройки VAPID');
-    }
+let pushPublicKey = '';
+try {
+    const configuration = await configureWebPush(db, process.env, origin);
+    pushPublicKey = configuration.publicKey;
+    pushReady = true;
+}
+catch {
+    app.log.error('Не удалось настроить Web Push. Проверьте миграции базы и пару VAPID-ключей.');
 }
 const bucket = process.env.S3_BUCKET || 'nimb';
 const storage = new S3Client({ endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000', region: process.env.S3_REGION || 'us-east-1', forcePathStyle: true, requestChecksumCalculation: 'WHEN_REQUIRED', responseChecksumValidation: 'WHEN_REQUIRED', credentials: { accessKeyId: process.env.S3_ACCESS_KEY || 'nimbminio', secretAccessKey: process.env.S3_SECRET_KEY || 'nimbminio-local-only' } });
@@ -503,16 +503,7 @@ async function relatedUsers(userId) { const [members, followers] = await Promise
 async function announceProfile(userId) { io.to(await relatedUsers(userId)).emit('profile:update', { id: userId }); }
 async function announcePresence(userId) { io.to(await relatedUsers(userId)).emit('presence:update', { id: userId }); }
 async function pushChatMessage(chatId, senderId) { if (!pushReady)
-    return; const subscriptions = await db.pushSubscription.findMany({ where: { session: { expiresAt: { gt: new Date() }, userId: { not: senderId }, user: { memberships: { some: { chatId } } } } }, take: 1000 }); await Promise.allSettled(subscriptions.map(async (sub) => { try {
-    await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify({ title: 'nimb', body: 'Новое сообщение', url: '/' }), { TTL: 60 });
-}
-catch (error) {
-    const status = error.statusCode;
-    if (status === 404 || status === 410)
-        await db.pushSubscription.deleteMany({ where: { id: sub.id } });
-    else
-        app.log.warn({ status }, 'Push-доставка не удалась');
-} })); }
+    return; const focusedSessions = [...io.of('/').sockets.values()].filter(socket => socket.data.pushVisible === true && socket.data.pushChatId === chatId).map(socket => socket.data.sessionId); const subscriptions = await db.pushSubscription.findMany({ where: { sessionId: { notIn: focusedSessions }, session: { expiresAt: { gt: new Date() }, userId: { not: senderId }, user: { suspended: false, memberships: { some: { chatId } } } } }, take: 1000 }); await deliverPush(db, subscriptions, { title: 'nimb', body: 'Новое сообщение', chatId, url: '/?chat=' + chatId }); }
 async function notifyChat(chatId, event, payload) { const members = await db.member.findMany({ where: { chatId } }); const message = event === 'message' && payload && typeof payload === 'object' && 'senderId' in payload && 'id' in payload ? payload : null; const chat = message ? await db.chat.findUnique({ where: { id: chatId }, select: { kind: true } }) : null; for (const m of members) {
     if (message && chat?.kind === 'direct' && m.userId !== message.senderId) {
         io.to(`user:${m.userId}`).timeout(5000).emit(event, payload, (_err, responses) => { if (responses?.some(response => response?.received))
@@ -803,9 +794,25 @@ app.patch('/api/communities/:id/members/:userId', async (req, reply) => { const 
 app.delete('/api/communities/:id/members/:userId', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = intId(req.params.id), userId = intId(req.params.userId); const actor = await member(id, s.userId), target = await member(id, userId); if (!actor || !target || target.role === 'owner' || !(userId === s.userId || actor.role === 'owner' || (actor.role === 'admin' && target.role === 'member')))
     return reply.code(404).send({ error: 'Участник не найден' }); await db.member.delete({ where: { chatId_userId: { chatId: id, userId } } }); return { ok: true }; });
+app.get('/api/push/status', async (req, reply) => { const s = await auth(req, reply); if (!s)
+    return; return { configured: pushReady, subscribed: (await db.pushSubscription.count({ where: { sessionId: s.id } })) > 0 }; });
+app.post('/api/push/test', { config: { rateLimit: { max: 3, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    if (!pushReady)
+        return reply.code(503).send({ error: 'Push временно недоступен на сервере' });
+    const subscriptions = await db.pushSubscription.findMany({ where: { sessionId: s.id } });
+    if (!subscriptions.length)
+        return reply.code(400).send({ error: 'Сначала включите push на этом устройстве' });
+    const result = await deliverPush(db, subscriptions, { title: 'nimb', body: 'Уведомления включены. Теперь вы не пропустите новые сообщения.', test: true, url: '/' });
+    if (!result.sent)
+        return reply.code(503).send({ error: 'Служба уведомлений не приняла тест. Отключите push и включите заново.' });
+    return { ok: true };
+});
 app.get('/api/push/public-key', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; if (!pushReady)
-    return reply.code(503).send({ error: 'Push-уведомления не настроены на сервере' }); return { publicKey: process.env.VAPID_PUBLIC_KEY }; });
+    return reply.code(503).send({ error: 'Push-уведомления не настроены на сервере' }); return { publicKey: pushPublicKey }; });
 app.post('/api/push/subscriptions', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const sub = z.object({ endpoint: z.string().url().max(2048), keys: z.object({ p256dh: z.string().regex(/^[A-Za-z0-9_-]{80,100}$/), auth: z.string().regex(/^[A-Za-z0-9_-]{20,32}$/) }) }).parse(req.body); if (!isAllowedPushEndpoint(sub.endpoint))
     return reply.code(400).send({ error: 'Недопустимый адрес службы уведомлений' }); if (!pushReady)
@@ -889,7 +896,10 @@ io.on('connection', socket => { const userId = socket.data.userId; socket.join(`
     void announcePresence(userId).catch(error => app.log.error(error));
 }
 else
-    onlineUsers.set(userId, left); }); socket.on('typing', async (input) => { try {
+    onlineUsers.set(userId, left); }); socket.on('push:activity', (input) => { const data = z.object({ chatId: z.number().int().positive().nullable(), visible: z.boolean() }).safeParse(input); if (data.success) {
+    socket.data.pushChatId = data.data.chatId;
+    socket.data.pushVisible = data.data.visible;
+} }); socket.on('typing', async (input) => { try {
     const parsed = z.object({ chatId: z.number().int().positive() }).safeParse(input);
     if (!parsed.success || Date.now() - (socket.data.lastTyping || 0) < 1000)
         return;

@@ -383,3 +383,10 @@ model StatRestore {
  backup StatCheckpoint @relation("RestoreBackup", fields:[backupId], references:[id], onDelete:Restrict)
  @@index([userId,id])
 }
+
+model WebPushConfig {
+ id Int @id
+ publicKey String
+ privateKey String
+ createdAt DateTime @default(now())
+}

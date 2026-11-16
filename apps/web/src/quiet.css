@@ -737,3 +737,5 @@
   color: var(--muted);
   margin: 12px 0;
 }
+
+.notification-heading {display:flex;align-items:center;gap:14px;margin-bottom:22px;}.notification-heading>svg {color:var(--accent);flex:none;}.notification-heading h2 {margin:0;}.notification-heading p {font-size:12px;color:var(--muted);margin:7px 0 0;}.notification-settings>.privacy-option {padding:18px 0;border-bottom:1px solid var(--line);}.notification-settings .privacy-option strong {font-size:13px;}.notification-settings .privacy-option small {font-size:11px;}.push-actions {display:flex;gap:10px;flex-wrap:wrap;margin:18px 0;}.push-actions button {display:flex;align-items:center;gap:8px;}.push-install-help {display:flex;align-items:flex-start;gap:12px;background:#14212c;padding:16px;border:1px solid var(--line-strong);border-radius:10px;margin:22px 0;}.push-install-help>svg {flex:none;color:#a4bdd1;}.push-install-help strong {font-size:13px;}.push-install-help ol {padding-left:18px;font-size:12px;line-height:1.85;margin:10px 0;}.push-install-help small {color:var(--muted);font-size:10px;}.push-notice {color:#accfb5;font-size:12px;line-height:1.7;}

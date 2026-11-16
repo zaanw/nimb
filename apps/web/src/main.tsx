@@ -76,7 +76,12 @@ import {
   initializePreferences,
   MotionPreferences,
 } from "./Preferences";
-import { NotificationSettings, notifyMessage } from "./Notifications";
+import {
+  NotificationSettings,
+  notifyMessage,
+  syncPushSubscription,
+  clearPushPreference,
+} from "./Notifications";
 import { Collections } from "./Collections";
 import { ProfileMusic, MusicEditor } from "./Music";
 import { ProfileLinks, LinksEditor } from "./ProfileLinks";
@@ -190,6 +195,11 @@ function App() {
     retry: false,
   });
   const [restoredUser, setRestoredUser] = useState<number | null>(null);
+  const [pushChatId, setPushChatId] = useState<number | null>(() => {
+    const raw = new URLSearchParams(location.search).get("chat");
+    const id = Number(raw);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  });
   const [tab, setTab] = useState("chats");
   const [selected, setSelected] = useState<Chat | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
@@ -240,7 +250,8 @@ function App() {
       );
       if (
         !location.search.includes("user=") &&
-        !location.search.includes("invite=")
+        !location.search.includes("invite=") &&
+        !pushChatId
       ) {
         const next = [
           "chats",
@@ -294,6 +305,7 @@ function App() {
     chats.data,
     chats.isError,
     restoredUser,
+    pushChatId,
   ]);
   useEffect(() => {
     const id = me.data?.user.id;
@@ -309,6 +321,64 @@ function App() {
       );
     } catch {}
   }, [restoredUser, me.data?.user.id, tab, setting, selected?.id, walletOpen]);
+  useEffect(() => {
+    if (me.data?.user.id) void syncPushSubscription();
+  }, [me.data?.user.id]);
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const receive = (event: MessageEvent) => {
+      const id = event.data?.chatId;
+      if (
+        event.data?.type === "OPEN_CHAT" &&
+        Number.isSafeInteger(id) &&
+        id > 0
+      )
+        void qc
+          .invalidateQueries({ queryKey: ["chats"] })
+          .then(() => setPushChatId(id));
+    };
+    navigator.serviceWorker.addEventListener("message", receive);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", receive);
+  }, [qc]);
+  useEffect(() => {
+    if (!pushChatId || !me.data || !chats.data || chats.isFetching) return;
+    const chat = chats.data.chats.find((c) => c.id === pushChatId);
+    const url = new URL(location.href);
+    url.searchParams.delete("chat");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    setTab("chats");
+    setWalletOpen(false);
+    setProfile(null);
+    setSetting("");
+    setReplyTo(null);
+    setMessageSearch("");
+    setShowMessageSearch(false);
+    if (chat) setSelected(chat);
+    else {
+      setSelected(null);
+      setError("Переписка из уведомления недоступна для этого аккаунта.");
+    }
+    setPushChatId(null);
+  }, [pushChatId, me.data?.user.id, chats.data, chats.isFetching]);
+  useEffect(() => {
+    const update = () =>
+      socketRef.current?.emit("push:activity", {
+        chatId: tab === "chats" && !profile ? selected?.id || null : null,
+        visible: document.visibilityState === "visible" && document.hasFocus(),
+      });
+    update();
+    document.addEventListener("visibilitychange", update);
+    window.addEventListener("nimb-socket-ready", update);
+    window.addEventListener("focus", update);
+    window.addEventListener("blur", update);
+    return () => {
+      document.removeEventListener("visibilitychange", update);
+      window.removeEventListener("nimb-socket-ready", update);
+      window.removeEventListener("focus", update);
+      window.removeEventListener("blur", update);
+    };
+  }, [selected?.id, tab, profile?.id]);
   const users = useQuery({
     queryKey: ["users", search],
     queryFn: () =>
@@ -334,6 +404,9 @@ function App() {
     if (!me.data) return;
     const socket = io({ withCredentials: true, transports: ["websocket"] });
     socketRef.current = socket;
+    socket.on("connect", () =>
+      window.dispatchEvent(new Event("nimb-socket-ready")),
+    );
     socket.on("connect", () => {
       qc.invalidateQueries({ queryKey: ["chats"] });
       qc.invalidateQueries({ queryKey: ["messages"] });
@@ -404,7 +477,7 @@ function App() {
             (document.visibilityState !== "visible" ||
               selectedRef.current?.id !== m.chatId)
           )
-            notifyMessage();
+            notifyMessage(m.chatId);
           if (
             event === "message" &&
             m.senderId !== me.data?.user.id &&
@@ -1523,7 +1596,7 @@ function App() {
                       className="logout"
                       onClick={async () => {
                         await api("/logout", send("POST", {}));
-                        localStorage.removeItem("nimb_push_enabled");
+                        clearPushPreference();
                         qc.clear();
                         location.reload();
                       }}
