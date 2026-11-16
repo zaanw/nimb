@@ -1,0 +1,5 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {isAllowedPushEndpoint,isAllowedSocialLink} from './policy.js';
+test('social links allow HTTPS but reject executable schemes and embedded credentials',()=>{assert.equal(isAllowedSocialLink('https://example.org/profile'),true);for(const link of ['javascript:alert(1)','data:text/html,hello','http://example.org','https://user:pass@example.org','not-a-url'])assert.equal(isAllowedSocialLink(link),false,link)});
+test('push endpoints reject local networks, impostor domains and embedded credentials',()=>{for(const url of ['https://fcm.googleapis.com/fcm/send/token','https://updates.push.services.mozilla.com/wpush/token','https://web.push.apple.com/token'])assert.equal(isAllowedPushEndpoint(url),true,url);for(const url of ['http://127.0.0.1:9000/','https://fcm.googleapis.com.evil.example/a','https://fcm.googleapis.com@evil.example/a','https://user@fcm.googleapis.com/a','https://fcm.googleapis.com:8443/a','file:///etc/passwd'])assert.equal(isAllowedPushEndpoint(url),false,url)});

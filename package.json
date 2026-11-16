@@ -1,0 +1,33 @@
+{
+  "name": "nimb",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @nimb/api\" \"npm run dev -w @nimb/web\"",
+    "build": "npm run build -w @nimb/api && npm run build -w @nimb/web",
+    "test": "npm run test -w @nimb/api",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "test:e2e": "playwright test",
+    "setup:push": "node scripts/setup-vapid.mjs",
+    "prebuild": "npm run db:generate",
+    "start": "npm run db:generate && npm run db:migrate && NODE_ENV=production STATIC_ROOT=bonto-release/web node bonto-release/api/index.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "concurrently": "^9.1.2",
+    "prisma": "^6.7.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.7.0"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2"
+    }
+  }
+}

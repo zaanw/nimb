@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id Int @id @default(autoincrement())
+  email String? @unique
+  username String @unique
+  name String
+  bio String @default("")
+  bioPrivate Boolean @default(false)
+  onlineVisible Boolean @default(true)
+  messagesFrom String @default("everyone")
+  links Json @default("[]")
+  avatarKey String?
+  bannerKey String?
+  hasAvatar Boolean @default(false)
+  hasBanner Boolean @default(false)
+  mediaVersion Int @default(0)
+  musicKey String?
+  musicCoverKey String?
+  hasMusicCover Boolean @default(false)
+  musicMime String?
+  musicTitle String @default("")
+  musicArtist String @default("")
+  musicVersion Int @default(0)
+  hasMusic Boolean @default(false)
+  badges BadgeAward[]
+  gifts Gift[] @relation("GiftOwner")
+  giftEvents GiftEvent[] @relation("GiftSender")
+  messageViews MessageView[]
+  messageDeliveries MessageDelivery[]
+  folders ChatFolder[]
+  passwordHash String
+  emailVerified Boolean @default(false)
+  nimbBalance Int @default(0)
+  currencyReceived CurrencyGrant[] @relation("CurrencyRecipient")
+  currencyGranted CurrencyGrant[] @relation("CurrencyAdmin")
+  purchasedUsernames UsernamePurchase[]
+  usernameGrants UsernamePurchase[] @relation("UsernameGrantAdmin")
+  suspended Boolean @default(false)
+  authTokens AuthToken[]
+  createdAt DateTime @default(now())
+  sessions Session[]
+  memberships Member[]
+  messages Message[]
+  blocksMade Block[] @relation("Blocking")
+  blocksReceived Block[] @relation("Blocked")
+  reportsMade Report[] @relation("ReportsMade")
+  reportsReceived Report[] @relation("ReportsReceived")
+  posts Post[]
+  postLikes PostLike[]
+  reactions Reaction[]
+  comments Comment[]
+  following Follow[] @relation("Following")
+  followers Follow[] @relation("Followers")
+}
+model Session {
+  id String @id
+  userId Int
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  pushSubscriptions PushSubscription[]
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+model Chat {
+  id Int @id @default(autoincrement())
+  pairKey String? @unique
+  kind String @default("direct")
+  title String @default("")
+  description String @default("")
+  inviteHash String? @unique
+  createdAt DateTime @default(now())
+  members Member[]
+  messages Message[]
+  folderEntries FolderChat[]
+  media CommunityMedia?
+}
+model Member {
+  chatId Int
+  userId Int
+  role String @default("member")
+  lastReadId Int @default(0)
+  chat Chat @relation(fields:[chatId], references:[id], onDelete: Cascade)
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  @@id([chatId,userId])
+}
+model Message {
+  id Int @id @default(autoincrement())
+  chatId Int
+  senderId Int
+  text String
+  replyToId Int?
+  pinned Boolean @default(false)
+  forwarded Boolean @default(false)
+  editedAt DateTime?
+  replyTo Message? @relation("MessageReplies", fields:[replyToId], references:[id], onDelete: SetNull)
+  replies Message[] @relation("MessageReplies")
+  reactions Reaction[]
+  views MessageView[]
+  deliveries MessageDelivery[]
+  attachment Attachment?
+  createdAt DateTime @default(now())
+  chat Chat @relation(fields:[chatId], references:[id], onDelete: Cascade)
+  sender User @relation(fields:[senderId], references:[id], onDelete: Cascade)
+  @@index([chatId,id])
+}
+
+model Block {
+  blockerId Int
+  blockedId Int
+  createdAt DateTime @default(now())
+  blocker User @relation("Blocking", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  @@id([blockerId, blockedId])
+}
+model Report {
+  id Int @id @default(autoincrement())
+  reporterId Int
+  reportedId Int
+  reason String
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+  reporter User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+  @@index([resolvedAt,id])
+}
+model Post {
+  id Int @id @default(autoincrement())
+  authorId Int
+  text String
+  createdAt DateTime @default(now())
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes PostLike[]
+  comments Comment[]
+  image PostImage?
+  @@index([id, authorId])
+}
+model PostLike {
+  postId Int
+  userId Int
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([postId,userId])
+}
+model Comment {
+  id Int @id @default(autoincrement())
+  postId Int
+  authorId Int
+  text String
+  createdAt DateTime @default(now())
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  @@index([postId, id])
+}
+model Follow {
+  followerId Int
+  followingId Int
+  follower User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  @@id([followerId, followingId])
+}
+
+model AuthToken {
+  id String @id
+  userId Int
+  kind String
+  expiresAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, kind])
+}
+
+model Reaction {
+  messageId Int
+  userId Int
+  emoji String
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([messageId, userId, emoji])
+}
+
+model Attachment {
+  id Int @id @default(autoincrement())
+  messageId Int @unique
+  objectKey String @unique
+  name String
+  mime String
+  size Int
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model BadgeAward {
+  userId Int
+  badge String
+  awardedAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@id([userId,badge])
+}
+model Gift {
+  id Int @id @default(autoincrement())
+  template String
+  ownerId Int
+  pinned Boolean @default(false)
+  receivedAt DateTime @default(now())
+  owner User @relation("GiftOwner", fields:[ownerId], references:[id], onDelete:Cascade)
+  events GiftEvent[]
+  @@index([ownerId,id])
+}
+model GiftEvent {
+  id Int @id @default(autoincrement())
+  giftId Int
+  senderId Int
+  createdAt DateTime @default(now())
+  gift Gift @relation(fields:[giftId], references:[id], onDelete:Cascade)
+  sender User @relation("GiftSender", fields:[senderId], references:[id], onDelete:Cascade)
+}
+model CurrencyGrant {
+  id Int @id @default(autoincrement())
+  recipientId Int
+  adminId Int
+  amount Int
+  createdAt DateTime @default(now())
+  recipient User @relation("CurrencyRecipient", fields:[recipientId], references:[id], onDelete:Cascade)
+  admin User @relation("CurrencyAdmin", fields:[adminId], references:[id], onDelete:Restrict)
+  @@index([recipientId, createdAt])
+}
+model UsernamePurchase {
+  id Int @id @default(autoincrement())
+  username String @unique
+  ownerId Int
+  price Int
+  grantedById Int?
+  grantedBy User? @relation("UsernameGrantAdmin", fields:[grantedById], references:[id], onDelete:SetNull)
+  purchasedAt DateTime @default(now())
+  owner User @relation(fields:[ownerId], references:[id], onDelete:Cascade)
+  @@index([ownerId])
+}
+model PostImage {
+  id Int @id @default(autoincrement())
+  postId Int @unique
+  objectKey String @unique
+  post Post @relation(fields:[postId], references:[id], onDelete:Cascade)
+}
+model MessageView {
+  messageId Int
+  userId Int
+  viewedAt DateTime @default(now())
+  message Message @relation(fields:[messageId], references:[id], onDelete:Cascade)
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@id([messageId,userId])
+}
+
+model PushSubscription {
+  id Int @id @default(autoincrement())
+  endpoint String @unique
+  p256dh String
+  auth String
+  sessionId String
+  session Session @relation(fields:[sessionId], references:[id], onDelete:Cascade)
+  @@index([sessionId])
+}
+
+model ChatFolder {
+  id Int @id @default(autoincrement())
+  userId Int
+  name String
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  chats FolderChat[]
+  @@index([userId,id])
+}
+model FolderChat {
+  folderId Int
+  chatId Int
+  folder ChatFolder @relation(fields:[folderId], references:[id], onDelete:Cascade)
+  chat Chat @relation(fields:[chatId], references:[id], onDelete:Cascade)
+  @@id([folderId,chatId])
+}
+
+model CommunityMedia {
+  chatId Int @id
+  avatarKey String?
+  bannerKey String?
+  hasAvatar Boolean @default(false)
+  hasBanner Boolean @default(false)
+  version Int @default(0)
+  chat Chat @relation(fields:[chatId], references:[id], onDelete:Cascade)
+}
+
+model MessageDelivery {
+  messageId Int
+  userId Int
+  deliveredAt DateTime @default(now())
+  message Message @relation(fields:[messageId], references:[id], onDelete:Cascade)
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@id([messageId,userId])
+}
