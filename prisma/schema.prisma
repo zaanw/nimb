@@ -59,6 +59,8 @@ model User {
   nimbBalance Int @default(0)
   currencyReceived CurrencyGrant[] @relation("CurrencyRecipient")
   currencyGranted CurrencyGrant[] @relation("CurrencyAdmin")
+  assetsReclaimed AssetReclaim[] @relation("ReclaimRecipient")
+  assetsReclaimedBy AssetReclaim[] @relation("ReclaimAdmin")
   purchasedUsernames UsernamePurchase[]
   usernameGrants UsernamePurchase[] @relation("UsernameGrantAdmin")
   suspended Boolean @default(false)
@@ -260,6 +262,24 @@ model CurrencyGrant {
   admin User @relation("CurrencyAdmin", fields:[adminId], references:[id], onDelete:Restrict)
   @@index([recipientId, createdAt])
 }
+model AssetReclaim {
+  id Int @id @default(autoincrement())
+  requestId String @unique
+  recipientId Int
+  adminId Int
+  kind String
+  value String
+  reason String
+  balanceBefore Int
+  balanceAfter Int
+  replacementUsername String?
+  checkpointId Int
+  createdAt DateTime @default(now())
+  recipient User @relation("ReclaimRecipient", fields:[recipientId], references:[id], onDelete:Cascade)
+  admin User @relation("ReclaimAdmin", fields:[adminId], references:[id], onDelete:Restrict)
+  checkpoint StatCheckpoint @relation(fields:[checkpointId], references:[id], onDelete:Restrict)
+  @@index([recipientId,createdAt])
+}
 model UsernamePurchase {
   public Boolean @default(false)
   id Int @id @default(autoincrement())
@@ -376,6 +396,7 @@ model StatCheckpoint {
  admin User @relation("CheckpointAdmin", fields:[adminId], references:[id], onDelete:Restrict)
  restoredFrom StatRestore[] @relation("RestoreSource")
  backups StatRestore[] @relation("RestoreBackup")
+ reclaims AssetReclaim[]
  @@index([userId,id])
 }
 model StatRestore {

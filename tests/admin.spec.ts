@@ -527,7 +527,9 @@ test("owner can ban a browser, cancel an IP ban, and revoke the browser ban on m
     .getByRole("button", { name: "Бан браузера", exact: true })
     .click();
   await panel.getByLabel("Причина", { exact: true }).fill("Обход блокировки");
-  await panel.getByLabel("Срок блокировки", { exact: true }).selectOption("forever");
+  await panel
+    .getByLabel("Срок блокировки", { exact: true })
+    .selectOption("forever");
   await panel
     .getByRole("button", { name: "Заблокировать", exact: true })
     .click();
@@ -553,4 +555,144 @@ test("owner can ban a browser, cancel an IP ban, and revoke the browser ban on m
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
+});
+
+test("owner can confirm a deduction and reclaim a primary username on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await adminFixture(page);
+  const user = {
+    id: 2,
+    name: "test",
+    username: "test",
+    collectibleNumber: "+666",
+    nimbBalance: 2500,
+    purchasedUsernames: [
+      { username: "204", price: 1000 },
+      { username: "+666", price: 0 },
+    ],
+  };
+  const history: any[] = [];
+  const requests: any[] = [];
+  await page.route("**/api/admin/users/2/reclaims", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      requests.push(body);
+      const before = user.nimbBalance;
+      let replacementUsername = null;
+      if (body.kind === "currency") user.nimbBalance -= body.amount;
+      else {
+        replacementUsername = "nimb_2_1234abcd";
+        user.username = replacementUsername;
+      }
+      history.unshift({
+        id: history.length + 1,
+        ...body,
+        value: body.kind === "currency" ? String(body.amount) : body.username,
+        balanceBefore: before,
+        balanceAfter: user.nimbBalance,
+        replacementUsername,
+        createdAt: "2026-11-17T15:00:00Z",
+      });
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          balance: user.nimbBalance,
+          replacementUsername,
+        }),
+      });
+    } else
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ user, history }),
+      });
+  });
+  await page
+    .getByRole("button", { name: "Списать нимбики", exact: true })
+    .click();
+  let panel = page.getByRole("dialog", {
+    name: "Списать нимбики",
+    exact: true,
+  });
+  await expect(panel).toContainText("2 500 N");
+  await panel.getByLabel("Сумма списания", { exact: true }).fill("2501");
+  await panel
+    .getByLabel("Причина", { exact: true })
+    .fill("Ошибочное начисление");
+  await expect(
+    panel.getByRole("button", { name: "Списать нимбики", exact: true }),
+  ).toBeDisabled();
+  await panel.getByLabel("Сумма списания", { exact: true }).fill("500");
+  await panel
+    .getByRole("button", { name: "Списать нимбики", exact: true })
+    .click();
+  let confirmation = page.getByRole("dialog", {
+    name: "Подтвердить списание?",
+    exact: true,
+  });
+  await expect(confirmation).toContainText("2 500 → 2 000 N");
+  await confirmation
+    .getByRole("button", { name: "Отмена", exact: true })
+    .click();
+  expect(requests).toHaveLength(0);
+  await panel
+    .getByRole("button", { name: "Списать нимбики", exact: true })
+    .click();
+  await confirmation
+    .getByRole("button", { name: "Списать", exact: true })
+    .click();
+  await expect(panel.getByRole("status")).toContainText("Осталось 2 000 N");
+  expect(requests[0]).toMatchObject({
+    kind: "currency",
+    amount: 500,
+    expectedBalance: 2500,
+    reason: "Ошибочное начисление",
+  });
+  expect(requests[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
+  await panel.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Забрать юзернейм или номер", exact: true })
+    .click();
+  panel = page.getByRole("dialog", {
+    name: "Забрать юзернейм или номер",
+    exact: true,
+  });
+  await panel
+    .getByLabel("Юзернейм или номер", { exact: true })
+    .selectOption("test");
+  await expect(panel).toContainText("Основной логин изменится на технический");
+  await panel
+    .getByLabel("Причина", { exact: true })
+    .fill("Отзыв спамного адреса");
+  await panel
+    .getByRole("button", { name: "Забрать адрес", exact: true })
+    .click();
+  confirmation = page.getByRole("dialog", {
+    name: "Забрать адрес?",
+    exact: true,
+  });
+  await expect(confirmation).toContainText(
+    "Для следующего входа понадобится новый логин или email",
+  );
+  await confirmation
+    .getByRole("button", { name: "Забрать адрес", exact: true })
+    .click();
+  await expect(panel.getByRole("status")).toContainText(
+    "Новый логин: @nimb_2_1234abcd",
+  );
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toMatchObject({
+    kind: "username",
+    username: "test",
+    reason: "Отзыв спамного адреса",
+  });
+  await expect(panel).toContainText("Отзыв спамного адреса");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({ path: "/tmp/nimb-reclaims-phone.png" });
 });

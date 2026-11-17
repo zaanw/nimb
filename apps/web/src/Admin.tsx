@@ -1,4 +1,5 @@
 import { NetworkBans } from "./NetworkBans";
+import { ReclaimAssets } from "./ReclaimAssets";
 import { StatRollback } from "./StatRollback";
 import { IdentityManager, UserName, type Identity } from "./Identity";
 import { useEffect, useState, type ReactNode } from "react";
@@ -66,6 +67,7 @@ type Operation = {
   kind: GrantKind | "identity";
   label: string;
   value: string;
+  reason?: string;
   createdAt: string;
   user: Pick<User, "id" | "username" | "name">;
   actor: Pick<User, "id" | "username" | "name"> | null;
@@ -199,6 +201,11 @@ function Operations({
                   ? ` · от @${event.actor.username}`
                   : ""}
               </span>
+              {!compact && event.reason && (
+                <small className="control-operation-reason">
+                  Причина: {event.reason}
+                </small>
+              )}
             </div>
             <div className="control-operation-value">
               <strong
@@ -560,6 +567,10 @@ function GrantDialog({
   );
 }
 export function Admin({ owner = false }: { owner?: boolean }) {
+  const [reclaim, setReclaim] = useState<{
+    userId: number;
+    kind: "currency" | "username";
+  } | null>(null);
   const [networkUser, setNetworkUser] = useState<number | null>(null);
   const [rollbackUser, setRollbackUser] = useState<{
     id: number;
@@ -1170,6 +1181,28 @@ export function Admin({ owner = false }: { owner?: boolean }) {
                     <span>Выдать юзернейм</span>
                     <ChevronRight size={15} />
                   </button>
+                  {owner && (
+                    <>
+                      <button
+                        onClick={() =>
+                          setReclaim({ userId: selected.id, kind: "currency" })
+                        }
+                      >
+                        <Coins size={18} />
+                        <span>Списать нимбики</span>
+                        <ChevronRight size={15} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setReclaim({ userId: selected.id, kind: "username" })
+                        }
+                      >
+                        <AtSign size={18} />
+                        <span>Забрать юзернейм или номер</span>
+                        <ChevronRight size={15} />
+                      </button>
+                    </>
+                  )}
                 </div>
                 {owner && (
                   <button
@@ -1383,6 +1416,14 @@ export function Admin({ owner = false }: { owner?: boolean }) {
         <NetworkBans
           userId={networkUser}
           onClose={() => setNetworkUser(null)}
+        />
+      )}
+      {reclaim && (
+        <ReclaimAssets
+          key={`${reclaim.userId}-${reclaim.kind}`}
+          userId={reclaim.userId}
+          kind={reclaim.kind}
+          onClose={() => setReclaim(null)}
         />
       )}
       {rollbackUser && (

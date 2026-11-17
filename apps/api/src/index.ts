@@ -1,3 +1,4 @@
+import {registerReclaims} from './reclaims.js';
 import {createNetworkGuard} from './network-bans.js';
 import {checkpoint,registerCheckpoints} from './checkpoints.js';
 import {registerMessenger} from './messenger.js';
@@ -144,12 +145,13 @@ app.get('/api/admin/activity', async(req,reply) => {
   if(!await adminAuth(req,reply)) return;
   const {userId}=z.object({userId:z.coerce.number().int().positive().optional()}).parse(req.query);
   const who={id:true,username:true,name:true} as const;
-  const [currency,presents,names,identity,restores]=await Promise.all([
+  const [currency,presents,names,identity,restores,reclaims]=await Promise.all([
     db.currencyGrant.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
     db.giftEvent.findMany({where:userId?{gift:{ownerId:userId}}:{},orderBy:{id:'desc'},take:50,include:{sender:{select:who},gift:{select:{template:true,owner:{select:who}}}}}),
     db.usernamePurchase.findMany({where:userId?{ownerId:userId}:{},orderBy:{id:'desc'},take:50,include:{owner:{select:who},grantedBy:{select:who}}}),
     db.identityGrant.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
     db.statRestore.findMany({where:userId?{userId}:{},orderBy:{id:'desc'},take:50,include:{user:{select:who},admin:{select:who},checkpoint:{select:{label:true}}}}),
+    db.assetReclaim.findMany({where:userId?{recipientId:userId}:{},orderBy:{id:'desc'},take:50,include:{recipient:{select:who},admin:{select:who}}}),
   ]);
   const events=[
     ...currency.map(e=>({id:'currency-'+e.id,kind:'currency',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:'Начисление нимбиков',value:'+'+e.amount.toLocaleString('ru-RU')})),
@@ -157,6 +159,7 @@ app.get('/api/admin/activity', async(req,reply) => {
     ...names.map(e=>({id:'username-'+e.id,kind:'username',createdAt:e.purchasedAt,user:e.owner,actor:e.grantedBy,label:e.username.startsWith('+')?(e.price===0?'Выдача номера':'Покупка номера'):(e.price===0?'Выдача юзернейма':'Покупка юзернейма'),value:e.username.startsWith('+')?e.username:'@'+e.username})),
     ...identity.map(e=>({id:'identity-'+e.id,kind:'identity',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:e.enabled?'Выдача привилегии':'Отзыв привилегии',value:e.kind==='verified'?'Верификация':badges[e.kind]?.name||e.kind})),
     ...restores.map(e=>({id:'restore-'+e.id,kind:'identity',createdAt:e.createdAt,user:e.user,actor:e.admin,label:e.kind==='reset'?'Обнуление счётчиков':'Откат статов',value:e.checkpoint.label})),
+    ...reclaims.map(e=>({id:'reclaim-'+e.id,kind:e.kind==='currency'?'currency':'username',createdAt:e.createdAt,user:e.recipient,actor:e.admin,label:e.kind==='currency'?'Списание нимбиков':e.value.startsWith('+')?'Отзыв номера':'Отзыв юзернейма',value:e.kind==='currency'?'−'+Number(e.value).toLocaleString('ru-RU'):e.value.startsWith('+')?e.value:'@'+e.value,reason:e.reason})),
   ].sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.id.localeCompare(a.id)).slice(0,50);
   return {events};
 });
@@ -279,6 +282,7 @@ networkGuard.register(app,auth,async(kind,value)=>{
   for(const socket of await io.fetchSockets())if(!adminIds.has(socket.data.userId)&&((kind==='ip'&&socket.data.clientIp===value)||(kind==='device'&&socket.data.deviceHash===value)))socket.disconnect(true);
 });
 registerIdentity(app,db,auth,announceProfile);
+registerReclaims(app,db,auth,async id=>{io.to(`user:${id}`).emit('wallet:update');await announceProfile(id)});
 registerCheckpoints(app,db,auth,async id=>{io.to(`user:${id}`).emit('wallet:update');io.to(`user:${id}`).emit('gift:new',{userId:id});await announceProfile(id)});
 registerMessenger(app,db,auth,id=>io.to(`user:${id}`).emit('personal:update'));
 app.get('/api/wallet',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const [user,owned]=await Promise.all([db.user.findUniqueOrThrow({where:{id:s.userId},select:{nimbBalance:true,username:true,collectibleNumber:true}}),db.usernamePurchase.findMany({where:{ownerId:s.userId},orderBy:{id:'desc'},select:{username:true,price:true,purchasedAt:true,public:true}})]);return {balance:user.nimbBalance,username:user.username,collectibleNumber:user.collectibleNumber,owned};});
