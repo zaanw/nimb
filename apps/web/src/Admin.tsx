@@ -1,3 +1,4 @@
+import { NetworkBans } from "./NetworkBans";
 import { StatRollback } from "./StatRollback";
 import { IdentityManager, UserName, type Identity } from "./Identity";
 import { useEffect, useState, type ReactNode } from "react";
@@ -559,6 +560,7 @@ function GrantDialog({
   );
 }
 export function Admin({ owner = false }: { owner?: boolean }) {
+  const [networkUser, setNetworkUser] = useState<number | null>(null);
   const [rollbackUser, setRollbackUser] = useState<{
     id: number;
     name: string;
@@ -1191,6 +1193,16 @@ export function Admin({ owner = false }: { owner?: boolean }) {
                     <ChevronRight size={16} />
                   </button>
                 )}
+                {owner && (
+                  <button
+                    className="identity-manage-button"
+                    onClick={() => setNetworkUser(selected.id)}
+                  >
+                    <ShieldOff size={19} />
+                    <span>Бан по IP и браузеру</span>
+                    <ChevronRight size={16} />
+                  </button>
+                )}
                 <dl className="control-person-meta">
                   <div>
                     <dt>В nimb с</dt>
@@ -1365,6 +1377,12 @@ export function Admin({ owner = false }: { owner?: boolean }) {
         <Failure
           message={catalog.error.message}
           retry={() => catalog.refetch()}
+        />
+      )}
+      {networkUser !== null && (
+        <NetworkBans
+          userId={networkUser}
+          onClose={() => setNetworkUser(null)}
         />
       )}
       {rollbackUser && (

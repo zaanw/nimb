@@ -7,6 +7,11 @@ datasource db {
 }
 model User {
   id Int @id @default(autoincrement())
+  loginDevices LoginDevice[]
+  targetedBans NetworkBan[] @relation("BanTarget")
+  bansCreated NetworkBan[] @relation("BanCreator")
+  bansRevoked NetworkBan[] @relation("BanRevoker")
+  proxiesTrusted TrustedProxy[]
   email String? @unique
   username String @unique
   name String
@@ -74,6 +79,8 @@ model User {
   followers Follow[] @relation("Followers")
 }
 model Session {
+  clientIp String?
+  deviceHash String?
   id String @id
   userId Int
   user User @relation(fields:[userId], references:[id], onDelete: Cascade)
@@ -81,6 +88,8 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   @@index([userId])
+  @@index([clientIp])
+  @@index([deviceHash])
 }
 model Chat {
   id Int @id @default(autoincrement())
@@ -389,4 +398,40 @@ model WebPushConfig {
  publicKey String
  privateKey String
  createdAt DateTime @default(now())
+}
+
+model LoginDevice {
+ id Int @id @default(autoincrement())
+ userId Int
+ ip String
+ deviceHash String
+ label String
+ firstSeen DateTime @default(now())
+ lastSeen DateTime @default(now())
+ user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+ @@unique([userId,ip,deviceHash])
+ @@index([userId,lastSeen])
+}
+model NetworkBan {
+ id Int @id @default(autoincrement())
+ kind String
+ value String
+ reason String
+ targetUserId Int?
+ createdById Int
+ revokedById Int?
+ createdAt DateTime @default(now())
+ expiresAt DateTime?
+ revokedAt DateTime?
+ target User? @relation("BanTarget", fields:[targetUserId], references:[id], onDelete:SetNull)
+ creator User @relation("BanCreator", fields:[createdById], references:[id], onDelete:Restrict)
+ revoker User? @relation("BanRevoker", fields:[revokedById], references:[id], onDelete:SetNull)
+ @@index([kind,value,revokedAt])
+ @@index([targetUserId,id])
+}
+model TrustedProxy {
+ ip String @id
+ createdById Int
+ createdAt DateTime @default(now())
+ creator User @relation(fields:[createdById], references:[id], onDelete:Restrict)
 }

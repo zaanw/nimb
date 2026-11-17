@@ -1,3 +1,4 @@
+import { createNetworkGuard } from './network-bans.js';
 import { checkpoint, registerCheckpoints } from './checkpoints.js';
 import { registerMessenger } from './messenger.js';
 import { identitySelect, collectibleName, collectiblePrice, lockName, registerIdentity } from './identity.js';
@@ -23,8 +24,10 @@ import { z, ZodError } from 'zod';
 import { gifts, badges } from './catalog.js';
 import { isAllowedPushEndpoint, isAllowedSocialLink } from './policy.js';
 const db = new PrismaClient();
+const adminIds = new Set([1, ...(process.env.ADMIN_USER_IDS || '').split(',').map(x => Number(x.trim())).filter(x => Number.isSafeInteger(x) && x > 0)]);
+const networkGuard = await createNetworkGuard(db, adminIds, process.env.NODE_ENV === 'production');
 const onlineUsers = new Map();
-const app = Fastify({ logger: { serializers: { req(req) { return { method: req.method, url: req.url.split('?')[0], hostname: req.hostname, remoteAddress: req.ip }; } } }, bodyLimit: 32 * 1024 });
+const app = Fastify({ trustProxy: (address) => networkGuard.isTrusted(address), logger: { serializers: { req(req) { return { method: req.method, url: req.url.split('?')[0], hostname: req.hostname, remoteAddress: req.ip }; } } }, bodyLimit: 32 * 1024 });
 const origin = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173';
 const production = process.env.NODE_ENV === 'production';
 if (production) {
@@ -39,6 +42,8 @@ await app.register(cookie);
 await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 1 } });
 await app.register(cors, { origin, credentials: true });
 await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+app.addHook('onRequest', networkGuard.onRequest);
+app.addHook('onSend', networkGuard.onSend);
 app.addHook('onRequest', async (req, reply) => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers.origin !== origin)
         return reply.code(403).send({ error: 'Недопустимый источник запроса' });
@@ -82,6 +87,7 @@ async function auth(req, reply) {
         reply.code(401).send({ error: 'Войдите в аккаунт' });
         return null;
     }
+    await networkGuard.observe(s.userId, s.id, networkGuard.context(req), String(req.headers['user-agent'] || ''));
     req.viewerId = s.userId;
     return s;
 }
@@ -99,9 +105,12 @@ app.addHook('preSerialization', async (req, _reply, payload) => { const redact =
     value.online = value.onlineVisible ? (onlineUsers.get(value.id) || 0) > 0 : null;
 } for (const child of Object.values(value))
     redact(child); }; redact(payload); return payload; });
-async function setSession(userId, reply) {
+async function setSession(userId, reply, req) {
+    if (!adminIds.has(userId) && await networkGuard.denied(networkGuard.context(req)))
+        throw Object.assign(new Error('Доступ с этого подключения ограничен администратором.'), { statusCode: 403 });
     const token = randomBytes(32).toString('hex');
     await db.session.create({ data: { id: digest(token), userId, expiresAt: new Date(Date.now() + 30 * 86400_000) } });
+    await networkGuard.observe(userId, digest(token), networkGuard.context(req), String(req.headers['user-agent'] || ''));
     reply.setCookie('nimb_session', token, { httpOnly: true, secure: production, sameSite: 'strict', path: '/', maxAge: 30 * 86400 });
 }
 const sendMail = createMailSender({ provider: process.env.MAIL_PROVIDER, brevoApiKey: process.env.BREVO_API_KEY, brevoSenderEmail: process.env.BREVO_SENDER_EMAIL, brevoSenderName: process.env.BREVO_SENDER_NAME, smtpHost: process.env.SMTP_HOST, smtpPort: process.env.SMTP_PORT, smtpSecure: process.env.SMTP_SECURE, smtpUser: process.env.SMTP_USER, smtpPassword: process.env.SMTP_PASSWORD, mailFrom: process.env.MAIL_FROM });
@@ -139,7 +148,7 @@ app.post('/api/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute
         return reply.code(409).send({ error: 'Это имя уже принадлежит другому пользователю' });
     if (user.id <= 100)
         await db.badgeAward.upsert({ where: { userId_badge: { userId: user.id, badge: 'early' } }, create: { userId: user.id, badge: 'early' }, update: {} });
-    await setSession(user.id, reply);
+    await setSession(user.id, reply, req);
     return { user };
 });
 app.post('/api/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
@@ -148,11 +157,13 @@ app.post('/api/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' }
     const u = identifier.includes('@') ? await db.user.findUnique({ where: { email: identifier } }) : await db.user.findUnique({ where: { username: identifier } });
     if (!u || !(await argon2.verify(u.passwordHash, data.password)))
         return reply.code(401).send({ error: 'Неверное имя пользователя или пароль' });
+    if (!adminIds.has(u.id) && await networkGuard.denied(networkGuard.context(req)))
+        return reply.code(403).send({ error: 'Доступ с этого подключения ограничен администратором.' });
     if (u.suspended)
         return reply.code(403).send({ error: 'Аккаунт ограничен администратором' });
     if (u.email && !u.emailVerified)
         return reply.code(403).send({ error: 'Подтвердите email по ссылке из письма' });
-    await setSession(u.id, reply);
+    await setSession(u.id, reply, req);
     req.viewerId = u.id;
     const user = await db.user.findUnique({ where: { id: u.id }, select: publicUser });
     return { user };
@@ -161,7 +172,7 @@ app.post('/api/verify-email', { config: { rateLimit: { max: 10, timeWindow: '1 m
     return reply.code(400).send({ error: 'Ссылка недействительна или устарела' }); const used = await db.$transaction(async (tx) => { const result = await tx.authToken.deleteMany({ where: { id: t.id, kind: 'verify', expiresAt: { gt: new Date() } } }); if (!result.count)
     return false; await tx.user.update({ where: { id: t.userId }, data: { emailVerified: true } }); if (t.userId <= 100)
     await tx.badgeAward.upsert({ where: { userId_badge: { userId: t.userId, badge: 'early' } }, create: { userId: t.userId, badge: 'early' }, update: {} }); return true; }); if (!used)
-    return reply.code(400).send({ error: 'Ссылка уже использована' }); await setSession(t.userId, reply); return { ok: true }; });
+    return reply.code(400).send({ error: 'Ссылка уже использована' }); await setSession(t.userId, reply, req); return { ok: true }; });
 app.post('/api/resend-verification', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => { const { email } = z.object({ email: z.string().email().max(254) }).parse(req.body); const u = await db.user.findUnique({ where: { email: email.toLowerCase() } }); if (u?.email && !u.emailVerified)
     try {
         await mailToken(u.id, u.email, 'verify');
@@ -184,7 +195,6 @@ app.post('/api/logout', async (req, reply) => { const s = await auth(req, reply)
     return; await db.session.deleteMany({ where: { id: s.id } }); for (const socket of (await io.in(`user:${s.userId}`).fetchSockets()))
     if (socket.data.sessionId === s.id)
         socket.disconnect(true); reply.clearCookie('nimb_session', { path: '/' }); return { ok: true }; });
-const adminIds = new Set([1, ...(process.env.ADMIN_USER_IDS || '').split(',').map(x => Number(x.trim())).filter(x => Number.isSafeInteger(x) && x > 0)]);
 async function adminAuth(req, reply) { const s = await auth(req, reply); if (!s)
     return null; if (!adminIds.has(s.userId)) {
     reply.code(403).send({ error: 'Доступ запрещён' });
@@ -585,6 +595,11 @@ app.delete('/api/messages/:id', async (req, reply) => { const s = await auth(req
     catch (err) {
         app.log.error(err);
     } await notifyChat(m.chatId, 'message:delete', { id, chatId: m.chatId }); return { ok: true }; });
+networkGuard.register(app, auth, async (kind, value) => {
+    for (const socket of await io.fetchSockets())
+        if (!adminIds.has(socket.data.userId) && ((kind === 'ip' && socket.data.clientIp === value) || (kind === 'device' && socket.data.deviceHash === value)))
+            socket.disconnect(true);
+});
 registerIdentity(app, db, auth, announceProfile);
 registerCheckpoints(app, db, auth, async (id) => { io.to(`user:${id}`).emit('wallet:update'); io.to(`user:${id}`).emit('gift:new', { userId: id }); await announceProfile(id); });
 registerMessenger(app, db, auth, id => io.to(`user:${id}`).emit('personal:update'));
@@ -882,6 +897,13 @@ io.use(async (socket, next) => { try {
     const s = await session(raw);
     if (!s)
         return next(new Error('Unauthorized'));
+    await networkGuard.refreshIfNeeded();
+    const access = networkGuard.context(socket.request);
+    if (!adminIds.has(s.userId) && await networkGuard.denied(access))
+        return next(new Error('Доступ ограничен'));
+    socket.data.clientIp = access.ip;
+    socket.data.deviceHash = access.deviceHash;
+    await networkGuard.observe(s.userId, s.id, access, String(socket.handshake.headers['user-agent'] || ''));
     socket.data.userId = s.userId;
     socket.data.sessionId = s.id;
     socket.data.expiresAt = s.expiresAt.getTime();
@@ -891,7 +913,9 @@ catch {
     next(new Error('Unauthorized'));
 } });
 io.on('connection', socket => { const userId = socket.data.userId; socket.join(`user:${userId}`); onlineUsers.set(userId, (onlineUsers.get(userId) || 0) + 1); if (onlineUsers.get(userId) === 1)
-    void announcePresence(userId).catch(error => app.log.error(error)); const timer = setTimeout(() => socket.disconnect(true), Math.min(2147483647, Math.max(0, socket.data.expiresAt - Date.now()))); socket.on('disconnect', () => { clearTimeout(timer); const left = (onlineUsers.get(userId) || 1) - 1; if (left <= 0) {
+    void announcePresence(userId).catch(error => app.log.error(error)); const timer = setTimeout(() => socket.disconnect(true), Math.min(2147483647, Math.max(0, socket.data.expiresAt - Date.now()))); const banTimer = setInterval(() => { if (!adminIds.has(userId))
+    void networkGuard.refreshIfNeeded().then(() => { const info = networkGuard.context(socket.request); socket.data.clientIp = info.ip; socket.data.deviceHash = info.deviceHash; return networkGuard.denied(info); }).then(denied => { if (denied)
+        socket.disconnect(true); }).catch(error => app.log.error(error)); }, 30000); banTimer.unref(); socket.on('disconnect', () => { clearTimeout(timer); clearInterval(banTimer); const left = (onlineUsers.get(userId) || 1) - 1; if (left <= 0) {
     onlineUsers.delete(userId);
     void announcePresence(userId).catch(error => app.log.error(error));
 }

@@ -361,7 +361,9 @@ test("owner can save a point, preview a restore and cancel before applying", asy
     } else if (route.request().method() === "POST") {
       points.unshift({
         id: 2,
-        label: path.endsWith("/reset-all")?"Нулевые статы":route.request().postDataJSON().label,
+        label: path.endsWith("/reset-all")
+          ? "Нулевые статы"
+          : route.request().postDataJSON().label,
         createdAt: "2026-11-16T09:30:00Z",
       });
       data = { point: points[0] };
@@ -425,12 +427,130 @@ test("owner can save a point, preview a restore and cancel before applying", asy
     .click();
   await page.keyboard.press("Escape");
   expect(resets).toBe(0);
-  await panel.getByRole('button',{name:'Обнулить все статы',exact:true}).click();await expect(panel.locator('table')).toContainText('Нимбики');expect(restores).toBe(1);
-  await panel.getByRole('button',{name:'Отмена',exact:true}).click();
+  await panel
+    .getByRole("button", { name: "Обнулить все статы", exact: true })
+    .click();
+  await expect(panel.locator("table")).toContainText("Нимбики");
+  expect(restores).toBe(1);
+  await panel.getByRole("button", { name: "Отмена", exact: true }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
   await page.screenshot({ path: "/tmp/nimb-stat-rollback-phone.png" });
+});
+
+test("owner can ban a browser, cancel an IP ban, and revoke the browser ban on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await adminFixture(page);
+  const records: any[] = [];
+  let revoked = 0;
+  await page.route("**/api/admin/network/status", async (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        peer: "172.17.0.1",
+        clientIp: "198.51.100.1",
+        publicClientIp: true,
+        trusted: true,
+        canTrust: false,
+      }),
+    }),
+  );
+  await page.route("**/api/admin/users/2/network**", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      records.push({
+        id: 1,
+        ...body,
+        createdAt: "2026-11-17T09:00:00Z",
+        expiresAt: null,
+        revokedAt: null,
+        active: true,
+      });
+      await route.fulfill({
+        contentType: "application/json",
+        body: '{"ok":true}',
+      });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: { id: 2, name: "test", username: "test" },
+        isAdmin: false,
+        devices: [
+          {
+            id: 1,
+            ip: "203.0.113.10",
+            deviceHash: "a".repeat(64),
+            label: "Safari · iOS",
+            firstSeen: "2026-11-17T08:00:00Z",
+            lastSeen: "2026-11-17T09:00:00Z",
+            publicIp: true,
+          },
+        ],
+        bans: records,
+      }),
+    });
+  });
+  await page.route("**/api/admin/network/bans/1/revoke", async (route) => {
+    revoked++;
+    records[0].active = false;
+    records[0].revokedAt = "2026-11-17T10:00:00Z";
+    await route.fulfill({
+      contentType: "application/json",
+      body: '{"ok":true}',
+    });
+  });
+  await page
+    .getByRole("button", { name: "Бан по IP и браузеру", exact: true })
+    .click();
+  const panel = page.getByRole("dialog", {
+    name: "Бан по IP и браузеру",
+    exact: true,
+  });
+  await expect(panel).toContainText("Safari · iOS");
+  await panel.getByRole("button", { name: "Бан IP", exact: true }).click();
+  await panel.getByLabel("Причина", { exact: true }).fill("Повторный спам");
+  await panel
+    .getByRole("button", { name: "Заблокировать", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  expect(records).toHaveLength(0);
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "Отмена", exact: true }).click();
+  await panel
+    .getByRole("button", { name: "Бан браузера", exact: true })
+    .click();
+  await panel.getByLabel("Причина", { exact: true }).fill("Обход блокировки");
+  await panel.getByLabel("Срок блокировки", { exact: true }).selectOption("forever");
+  await panel
+    .getByRole("button", { name: "Заблокировать", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Заблокировать браузер?", exact: true })
+    .getByRole("button", { name: "Заблокировать", exact: true })
+    .click();
+  await expect(panel.getByRole("status")).toContainText("Блокировка включена");
+  expect(records[0].kind).toBe("device");
+  expect(records[0].hours).toBe(null);
+  await page.screenshot({ path: "/tmp/nimb-network-bans-phone.png" });
+  await panel
+    .getByRole("button", { name: "Снять блокировку", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Снять блокировку?", exact: true })
+    .getByRole("button", { name: "Снять блокировку", exact: true })
+    .click();
+  await expect(panel.getByRole("status")).toContainText("Блокировка снята");
+  expect(revoked).toBe(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
 });
