@@ -243,7 +243,7 @@ export function Collections({
               }
             >
               {"template" in detail ? (
-                <GiftArtwork template={detail.template} />
+                <GiftArtwork template={detail.template} animate />
               ) : (
                 <BadgeIcon id={detail.id} size={50} />
               )}

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gifts } from "../apps/api/src/catalog";
 
 // Isolated UI fixtures: these checks never call a real account or wallet.
 async function fixture(page: Page, isAdmin = true, secondChat = false) {
@@ -251,11 +252,11 @@ test("illustrated gift details show actual ownership and preserve the pin action
           {
             id: 42,
             template: "moon",
-            name: "Луна",
+            name: "Moon Pendant",
             icon: "☾",
             rarity: "Особенный",
             color: "mint",
-            description: "Маленький свет в ночи.",
+            description: "Золотая подвеска с луной и звездой.",
             ownerId: 1,
             pinned: false,
             receivedAt: "2026-11-20T12:00:00Z",
@@ -279,8 +280,27 @@ test("illustrated gift details show actual ownership and preserve the pin action
     .click();
   await expect(page.locator(".gift-tile .gift-artwork")).toBeVisible();
   await page.locator(".gift-tile").click();
-  const detail = page.getByRole("dialog", { name: "Луна", exact: true });
+  const detail = page.getByRole("dialog", {
+    name: "Moon Pendant",
+    exact: true,
+  });
   await expect(detail.locator(".gift-artwork")).toBeVisible();
+  await expect(detail.locator(".gift-artwork > img")).toHaveJSProperty(
+    "complete",
+    true,
+  );
+  expect(
+    await detail
+      .locator(".gift-artwork > img")
+      .evaluate((img: HTMLImageElement) => img.naturalWidth),
+  ).toBeGreaterThan(0);
+  await expect(detail.locator(".gift-animation svg")).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(detail.locator(".gift-artwork")).not.toHaveClass(/is-playing/);
+  await expect(detail.locator(".gift-artwork > img")).toHaveCSS("opacity", "1");
+  await expect(detail.locator(".gift-animation svg")).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(detail.locator(".gift-animation svg")).toBeVisible();
   await expect(detail.locator(".gift-facts")).toContainText("#42");
   await expect(detail.locator(".gift-facts")).toContainText("ID 1");
   await expect(detail.locator(".gift-facts")).toContainText("@alex");
@@ -460,4 +480,81 @@ test("drafts survive a reload and remain separate between conversations", async 
   );
   await page.locator(".chat-list-item").nth(1).click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue("");
+});
+
+test("Telegram gift posters stay inside three-column cards at phone and desktop sizes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, false);
+  const collection = Object.entries(gifts).map(([template, gift], index) => ({
+    ...gift,
+    template,
+    id: index + 1,
+    ownerId: 1,
+    pinned: index === 0,
+    receivedAt: "2026-11-20T12:00:00Z",
+    sender: null,
+  }));
+  await page.route("**/api/users/1/gifts", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ gifts: collection }),
+    }),
+  );
+  await page
+    .locator(".mobile-nav")
+    .getByRole("button", { name: "Профиль", exact: true })
+    .click();
+  await expect(page.locator(".gift-tile")).toHaveCount(8);
+  for (const image of await page
+    .locator(".gift-tile .gift-artwork > img")
+    .all()) {
+    await expect(image).toHaveJSProperty("complete", true);
+    expect(
+      await image.evaluate((node: HTMLImageElement) => node.naturalWidth),
+    ).toBeGreaterThan(0);
+  }
+  await page.evaluate(() => document.fonts.ready);
+  for (const width of [320, 390, 820, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const boxes = await page.locator(".gift-tile").evaluateAll((tiles) =>
+      tiles.map((tile) => {
+        const bounds = tile.getBoundingClientRect();
+        const grid = tile.parentElement!.getBoundingClientRect();
+        return {
+          left: bounds.left,
+          right: bounds.right,
+          gridLeft: grid.left,
+          gridRight: grid.right,
+        };
+      }),
+    );
+    expect(
+      boxes.every(
+        (box) => box.left >= box.gridLeft - 1 && box.right <= box.gridRight + 1,
+      ),
+      String(width),
+    ).toBeTruthy();
+    expect(
+      boxes[0].right <= boxes[1].left && boxes[1].right <= boxes[2].left,
+      String(width),
+    ).toBeTruthy();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+  }
+  for (const gift of collection) {
+    await page.locator(".gift-tile").filter({ hasText: gift.name }).click();
+    const detail = page.getByRole("dialog", { name: gift.name, exact: true });
+    await expect(detail.locator(".gift-artwork.is-playing")).toBeVisible();
+    expect(
+      await detail.locator(".gift-animation svg path").count(),
+    ).toBeGreaterThan(0);
+    await detail.getByRole("button", { name: "Закрыть", exact: true }).click();
+    await expect(detail).toBeHidden();
+  }
+  await expect(page.locator(".gift-animation")).toHaveCount(0);
 });

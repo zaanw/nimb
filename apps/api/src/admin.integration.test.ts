@@ -209,7 +209,7 @@ test(
     );
     assert.ok(
       history.data.events.some(
-        (e: any) => e.kind === "gift" && e.value === "Кристалл",
+        (e: any) => e.kind === "gift" && e.value === "Astral Shard",
       ),
     );
     assert.ok(
@@ -243,6 +243,51 @@ test(
     assert.equal(
       (await api("/admin/overview", owner.cookie)).data.openReports,
       0,
+    );
+    const catalog = await api("/catalog/gifts", owner.cookie);
+    assert.equal(catalog.status, 200);
+    assert.equal(catalog.data.templates.length, 8);
+    assert.equal(
+      catalog.data.templates.find((gift: any) => gift.id === "pepe").name,
+      "Plush Pepe",
+    );
+    assert.equal(
+      catalog.data.templates.find((gift: any) => gift.id === "bear").name,
+      "Toy Bear",
+    );
+    assert.equal(
+      (await api("/admin/users/2/gifts", owner.cookie, { template: "pepe" }))
+        .status,
+      200,
+    );
+    assert.equal(
+      (await api("/users/2/gifts", owner.cookie, { template: "bear" })).status,
+      200,
+    );
+    assert.equal(
+      (
+        await api("/admin/users/2/gifts", owner.cookie, {
+          template: "unknown_gift",
+        })
+      ).status,
+      400,
+    );
+    const collection = await api("/users/2/gifts", owner.cookie);
+    assert.ok(
+      collection.data.gifts.some(
+        (gift: any) => gift.template === "pepe" && gift.name === "Plush Pepe",
+      ),
+    );
+    assert.ok(
+      collection.data.gifts.some(
+        (gift: any) => gift.template === "bear" && gift.name === "Toy Bear",
+      ),
+    );
+    assert.ok(
+      collection.data.gifts.some(
+        (gift: any) =>
+          gift.template === "diamond" && gift.name === "Astral Shard",
+      ),
     );
   },
 );

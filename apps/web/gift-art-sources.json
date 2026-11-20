@@ -1,0 +1,95 @@
+{
+  "retrievedAt": "2026-11-20",
+  "description": "Telegram gift artwork, mirrored from the public CDN archive. This manifest records provenance, not a license grant. These are internal Nimb gifts, not Telegram NFTs.",
+  "sourceRepository": "https://github.com/denzyve/cdn-telegram-gifts",
+  "assets": [
+    {
+      "template": "star",
+      "name": "Hanging Star",
+      "telegramGiftId": "5915733223018594841",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5915733223018594841.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5915733223018594841.tgs",
+      "posterGitBlob": "444fa5faa8bed8c92b08e3d78d914cab5882c59e",
+      "animationGitBlob": "1af4626b35cf1f857041c4c2a50b3c6184452b95",
+      "posterSHA256": "d1becf0bf9496dbe628617214e06d378ce91b4659787eb488b6d17054ea8bbd4",
+      "animationSHA256": "6b1d8f5b41d4da17f8946194f16bbd65b087916b5f07120184d03c4bbe78f7b1"
+    },
+    {
+      "template": "heart",
+      "name": "Heart Locket",
+      "telegramGiftId": "5868455043362980631",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5868455043362980631.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5868455043362980631.tgs",
+      "posterGitBlob": "d61bbb9d90f480ff74b2fecf91d38e4b00fefd9a",
+      "animationGitBlob": "5bad830280946d54448b6ac8c63aa6a501f794a0",
+      "posterSHA256": "90c2ed676330b3f12c3ad5d6c8d7355b518cc5739e3c7fcf42bd630de55d7b98",
+      "animationSHA256": "9959bad88f6bbb1786abd14662751f6380d1c4ccb75b510793e7d6a23c15cadf"
+    },
+    {
+      "template": "flower",
+      "name": "Pretty Posy",
+      "telegramGiftId": "5933737850477478635",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5933737850477478635.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5933737850477478635.tgs",
+      "posterGitBlob": "e2057414fb1236a72d5f3b0548960398a279d148",
+      "animationGitBlob": "bb95c29816a0e68555fafe5e12860f3258076a6c",
+      "posterSHA256": "8e8fb6d74d10b151f283096e1c93fab3a927de5e1c8eeb5092fcd18adebfbe77",
+      "animationSHA256": "49a6dd029d33a5e5a9c89f2e79c0c09cfe0fa01cdfa2395759bfa8ef9be149f9"
+    },
+    {
+      "template": "comet",
+      "name": "Stellar Rocket",
+      "telegramGiftId": "6042113507581755979",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_6042113507581755979.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_6042113507581755979.tgs",
+      "posterGitBlob": "93e59ad52916b01a680f789f520a61585bebbd38",
+      "animationGitBlob": "181020eb5f2b65a94c3485b9f2bdea5c305ae4d8",
+      "posterSHA256": "aa8b5bfeb9b9bd207ac11f2485b73f00e878da5ebf161a7b87a5833bd57a07e8",
+      "animationSHA256": "73466b587dd07d8a58cb016a1aa2321a848f6819f23fe69c5cc98ee46e10415b"
+    },
+    {
+      "template": "moon",
+      "name": "Moon Pendant",
+      "telegramGiftId": "5998981470310368313",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5998981470310368313.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5998981470310368313.tgs",
+      "posterGitBlob": "fe720bfa64a17aa580ef01e8071c23b66656f609",
+      "animationGitBlob": "2e41e9fa6f7aabd5f06d82f0cf8c9e1645853bd5",
+      "posterSHA256": "4ffdefe00720b328959585b9d7b6a1ce10ca42b284bb7a33905323215cbf48ce",
+      "animationSHA256": "c919f41fae5053c188efd60674f2b0f18ffb804760249e44de4f610064ecae83"
+    },
+    {
+      "template": "diamond",
+      "name": "Astral Shard",
+      "telegramGiftId": "5933629604416717361",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5933629604416717361.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5933629604416717361.tgs",
+      "posterGitBlob": "1fe9351d13b07e69be91a414281d0214ad6741b2",
+      "animationGitBlob": "64a9bba48d80de28f683526a3befda53d288c09c",
+      "posterSHA256": "d3f70464f3213b16dfa0ab358a8c30ef719a2156218526293883ccdd2d94e345",
+      "animationSHA256": "4b69778b720819db02cb35c22657afb536f22b319cec6c203096002204688959"
+    },
+    {
+      "template": "pepe",
+      "name": "Plush Pepe",
+      "telegramGiftId": "5936013938331222567",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5936013938331222567.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5936013938331222567.tgs",
+      "posterGitBlob": "d64561d41571f7a2d081e9f9cd8057210bb20fd9",
+      "animationGitBlob": "4f660e4b63ffddcfff8a4970c71bb6513a9a4807",
+      "posterSHA256": "8d423063f8286e99e029285f4e17cd07ae8501e8dd84aec08e3fce451a1e9b70",
+      "animationSHA256": "303a4f668bab9b860cfc77a25bce72ee0ccb48791f8b1a29dcaa8c890591cd63"
+    },
+    {
+      "template": "bear",
+      "name": "Toy Bear",
+      "telegramGiftId": "5868220813026526561",
+      "posterSource": "https://github.com/denzyve/cdn-telegram-gifts/blob/main/assets/webp/gift_5868220813026526561.webp",
+      "animationSource": "https://raw.githubusercontent.com/denzyve/cdn-telegram-gifts/main/assets/tgs/gift_5868220813026526561.tgs",
+      "posterGitBlob": "21825ecab9147b82893d59ea17820d0609a350c7",
+      "animationGitBlob": "c82e07705f9ca95dc035c4bafbbfdbdd615055c3",
+      "posterSHA256": "9a34b92ab7939dbedd268c35bdf15232822a1472a29506f3bdc5e56adb1a20dd",
+      "animationSHA256": "2ae05f9bea52df5554975cf8b3267f8511cbd81de1fcec7bd0706175f0e627bc"
+    }
+  ]
+}

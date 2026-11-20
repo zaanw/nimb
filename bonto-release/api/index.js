@@ -22,7 +22,7 @@ import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { configureWebPush, deliverPush } from './webpush.js';
 import { z, ZodError } from 'zod';
-import { gifts, badges } from './catalog.js';
+import { gifts, badges, giftTemplateIds } from './catalog.js';
 import { isAllowedPushEndpoint, isAllowedSocialLink } from './policy.js';
 const db = new PrismaClient();
 const adminIds = new Set([1, ...(process.env.ADMIN_USER_IDS || '').split(',').map(x => Number(x.trim())).filter(x => Number.isSafeInteger(x) && x > 0)]);
@@ -288,7 +288,7 @@ app.post('/api/admin/users/:id/currency', { config: { rateLimit: { max: 30, time
     return null; await tx.currencyGrant.create({ data: { adminId: actor.userId, recipientId: id, amount } }); return tx.user.findUniqueOrThrow({ where: { id }, select: { nimbBalance: true } }); }); if (!result)
     return reply.code(400).send({ error: 'Пользователь не найден или превышен максимальный баланс' }); io.to(`user:${id}`).emit('wallet:update'); return { balance: result.nimbBalance }; });
 app.post('/api/admin/users/:id/gifts', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
-    return; const id = z.coerce.number().int().positive().parse(req.params.id); const { template } = z.object({ template: z.enum(['star', 'heart', 'flower', 'comet', 'moon', 'diamond']) }).parse(req.body); if (!await db.user.findUnique({ where: { id }, select: { id: true } }))
+    return; const id = z.coerce.number().int().positive().parse(req.params.id); const { template } = z.object({ template: z.enum(giftTemplateIds) }).parse(req.body); if (!await db.user.findUnique({ where: { id }, select: { id: true } }))
     return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${id})`; await checkpoint(tx, id, actor.userId, 'Перед выдачей подарка'); return tx.gift.create({ data: { ownerId: id, template, events: { create: { senderId: actor.userId } } } }); }); io.to(`user:${id}`).emit('gift:new', { userId: id }); return { gift: { id: gift.id } }; });
 app.get('/api/admin/reports', async (req, reply) => {
     if (!await adminAuth(req, reply))
@@ -689,7 +689,7 @@ app.get('/api/users/:id/gifts', async (req, reply) => { const s = await auth(req
     return; const userId = intId(req.params.id); if (!await db.user.findUnique({ where: { id: userId } }) || await blocked(s.userId, userId))
     return reply.code(404).send({ error: 'Пользователь не найден' }); const owned = await db.gift.findMany({ where: { ownerId: userId }, orderBy: [{ pinned: 'desc' }, { id: 'desc' }], take: 100, include: { events: { take: 1, orderBy: { id: 'asc' }, include: { sender: { select: publicUser } } } } }); return { gifts: owned.filter(g => g.template in gifts).map(g => ({ id: g.id, template: g.template, ...gifts[g.template], pinned: g.pinned, receivedAt: g.receivedAt, ownerId: g.ownerId, sender: g.events[0]?.sender || null })) }; });
 app.post('/api/users/:id/gifts', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const userId = intId(req.params.id); const { template } = z.object({ template: z.enum(['star', 'heart', 'flower', 'comet', 'moon', 'diamond']) }).parse(req.body); if (userId === s.userId)
+    return; const userId = intId(req.params.id); const { template } = z.object({ template: z.enum(giftTemplateIds) }).parse(req.body); if (userId === s.userId)
     return reply.code(400).send({ error: 'Подарок можно отправить другому пользователю' }); if (!await db.user.findUnique({ where: { id: userId } }) || await blocked(s.userId, userId))
     return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.gift.create({ data: { ownerId: userId, template, events: { create: { senderId: s.userId } } } }); io.to(`user:${userId}`).emit('gift:new', { userId }); return { gift }; });
 app.patch('/api/gifts/:id/pin', async (req, reply) => { const s = await auth(req, reply); if (!s)

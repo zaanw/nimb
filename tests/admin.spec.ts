@@ -22,12 +22,14 @@ async function adminFixture(page: Page) {
     },
   ];
   const gifts = [
-    ["star", "Звезда", "✦", "blue"],
-    ["heart", "Сердце", "♥", "rose"],
-    ["flower", "Цветок", "✿", "violet"],
-    ["comet", "Комета", "☄", "gold"],
-    ["moon", "Луна", "☾", "mint"],
-    ["diamond", "Кристалл", "◆", "indigo"],
+    ["star", "Hanging Star", "✦", "blue"],
+    ["heart", "Heart Locket", "♥", "rose"],
+    ["flower", "Pretty Posy", "✿", "violet"],
+    ["comet", "Stellar Rocket", "☄", "gold"],
+    ["moon", "Moon Pendant", "☾", "mint"],
+    ["diamond", "Astral Shard", "◆", "indigo"],
+    ["pepe", "Plush Pepe", "🐸", "mint"],
+    ["bear", "Toy Bear", "🧸", "rose"],
   ].map(([id, name, icon, color]) => ({
     id,
     name,
@@ -52,7 +54,7 @@ async function adminFixture(page: Page) {
       id: "gift-1",
       kind: "gift",
       label: "Подарок",
-      value: "Звезда",
+      value: "Hanging Star",
       createdAt: "2026-11-15T16:10:00Z",
       user: people[0],
       actor: people[1],
@@ -197,7 +199,7 @@ test("gift picker selects the actual template; cancelling never sends a grant", 
     .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: /Кристалл/ })
+    .getByRole("button", { name: /Astral Shard/ })
     .click();
   await page
     .getByRole("dialog")
@@ -210,7 +212,7 @@ test("gift picker selects the actual template; cancelling never sends a grant", 
     .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: /Кристалл/ })
+    .getByRole("button", { name: /Astral Shard/ })
     .click();
   await page
     .getByRole("dialog")
@@ -220,7 +222,7 @@ test("gift picker selects the actual template; cancelling never sends a grant", 
     .getByRole("dialog")
     .getByRole("button", { name: "Отправить подарок" })
     .click();
-  await expect(page.locator(".control-toast")).toContainText("Кристалл");
+  await expect(page.locator(".control-toast")).toContainText("Astral Shard");
   expect(requests).toEqual([
     { path: "/admin/users/2/gifts", body: { template: "diamond" } },
   ]);
@@ -300,7 +302,7 @@ test("admin, gift dialog and review fit phone, tablet and large desktop", async 
       .getByRole("button", { name: "Отправить подарок пользователю @test" })
       .click();
     await expect(
-      page.getByRole("dialog").getByRole("button", { name: /Звезда/ }),
+      page.getByRole("dialog").getByRole("button", { name: /Hanging Star/ }),
     ).toBeVisible();
     const box = await page.getByRole("dialog").boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
