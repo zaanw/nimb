@@ -100,6 +100,8 @@ import { ProfileIdentifiers } from "./ProfileIdentifiers";
 import { UserName, IdentitySettings, type Identity } from "./Identity";
 import "./theme.css";
 import "./quiet.css";
+import "./reference.css";
+import { SettingsMenu, SettingsOverview } from "./SettingsMenu";
 initializePreferences();
 
 type User = Identity & {
@@ -230,6 +232,7 @@ function App() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const selectedRef = useRef<Chat | null>(null);
   selectedRef.current = selected;
@@ -493,7 +496,8 @@ function App() {
     };
   }, [me.data?.user.id, qc]);
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "smooth" });
+    const area = end.current?.closest(".message-area");
+    area?.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
   }, [messages.data?.pages[0]?.messages.at(-1)?.id, selected?.id]);
   useEffect(() => {
     if (!me.data) return;
@@ -658,6 +662,7 @@ function App() {
         : undefined;
   function nav(t: string) {
     window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
     setWalletOpen(t === "wallet");
     setSearch("");
     setReplyTo(null);
@@ -694,6 +699,46 @@ function App() {
         (messenger && (selected || profile) ? " conversation-open" : "")
       }
     >
+      <header className="app-topbar">
+        <button
+          className="topbar-brand"
+          onClick={() => nav("chats")}
+          aria-label="Nimb — на главную"
+        >
+          <Brand />
+        </button>
+        <span className="topbar-divider" />
+        <span className="topbar-caption">Место для своих</span>
+        <div className="topbar-actions">
+          <button
+            className="outline topbar-create"
+            onClick={() => setCommunityDialog(true)}
+          >
+            <Plus size={17} />
+            Создать
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Открыть настройки"
+            onClick={() => nav("settings")}
+          >
+            <Settings size={19} />
+          </button>
+          <button
+            className="topbar-account"
+            aria-label="Открыть мой профиль"
+            onClick={() => nav("profile")}
+          >
+            <Avatar user={user} />
+            <span>
+              <strong>
+                <UserName user={user} />
+              </strong>
+              <small>@{user.username}</small>
+            </span>
+          </button>
+        </div>
+      </header>
       <aside className="sidebar" aria-label="Основная навигация">
         <button
           className="side-brand"
@@ -740,6 +785,7 @@ function App() {
         </button>
       </aside>
       <main
+        ref={mainRef}
         className={
           "main " +
           (messenger
@@ -1423,188 +1469,132 @@ function App() {
               <Admin owner={user.id === 1} />
             ) : (
               <>
-                <header className="settings-heading">
-                  <PageHeading
-                    eyebrow="ПОД ВАС"
-                    title="Настройки"
-                    description="Аккаунт, безопасность и оформление."
-                  />
-                </header>
-                {setting ? (
-                  <>
-                    <button
-                      className="back-link"
-                      onClick={() => setSetting("")}
-                    >
-                      <ArrowLeft size={18} /> Все настройки
-                    </button>
-                    {setting === "Установить приложение" ? (
-                      <InstallApp {...installApp} />
-                    ) : setting === "Администрирование" ? (
-                      <Admin owner={user.id === 1} />
-                    ) : setting === "nimb Plus" ? (
-                      <IdentitySettings
-                        key={`${user.id}-${user.plus}`}
-                        user={user}
-                      />
-                    ) : setting === "Аккаунт" ? (
-                      <AccountSettings
-                        edit={() => {
-                          setSetting("");
-                          setTab("profile");
-                          setEditing(true);
-                        }}
-                      />
-                    ) : setting === "Хранилище" ? (
-                      <StorageSettings />
-                    ) : setting === "О приложении" ? (
-                      <AboutSettings />
-                    ) : setting === "Язык" ? (
-                      <LanguageSettings />
-                    ) : setting === "Папки с чатами" ? (
-                      <FolderSettings
-                        chats={chats.data?.chats || []}
-                        userId={user.id}
-                      />
-                    ) : setting === "Уведомления" ? (
-                      <NotificationSettings />
-                    ) : ["Шрифты", "Оформление", "Производительность"].includes(
-                        setting,
-                      ) ? (
-                      <Preferences section={setting} />
-                    ) : setting === "Конфиденциальность" ? (
-                      <PrivacySettings
-                        user={user}
-                        onUpdate={(u) =>
-                          qc.setQueryData(
-                            ["me"],
-                            (
-                              old:
-                                { user: User; isAdmin?: boolean } | undefined,
-                            ) => ({ ...old, user: u }),
-                          )
-                        }
-                      />
-                    ) : ["Безопасность", "Устройства"].includes(setting) ? (
-                      <SecuritySettings section={setting} />
-                    ) : (
-                      <div className="setting-detail">
-                        <h2>{setting}</h2>
-                        <p>В разработке</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {me.data?.isAdmin && (
-                      <button
-                        className="admin-entry"
-                        onClick={() => nav("admin")}
-                      >
-                        <span className="admin-entry-icon">
-                          <Shield size={20} />
-                        </span>
-                        <span>
-                          <strong>Панель администратора</strong>
-                          <small>Пользователи, подарки и жалобы</small>
-                        </span>
-                        <ChevronRight size={19} />
-                      </button>
-                    )}
-                    <div className="search-box settings-search">
-                      <Search size={19} />
-                      <input
-                        placeholder="Поиск"
-                        aria-label="Поиск настроек"
-                        value={settingsSearch}
-                        onChange={(e) => setSettingsSearch(e.target.value)}
-                      />
-                    </div>
-                    <button
-                      className="settings-profile"
-                      onClick={() => nav("profile")}
-                    >
-                      <Avatar user={user} />
-                      <span>
-                        <strong>
-                          <UserName user={user} />
-                        </strong>
-                        <small>@{user.username}</small>
-                      </span>
-                      <ChevronRight size={18} />
-                    </button>
-                    <div className="settings-groups">
-                      {[
-                        [
-                          ["Аккаунт", UserRound, "blue"],
-                          ["nimb Plus", Sparkles, "purple"],
-                          ["Уведомления", Bell, "red"],
-                        ],
-                        [
-                          ["Язык", Globe, "purple"],
-                          ["Конфиденциальность", Shield, "blue"],
-                          ["Устройства", Monitor, "orange"],
-                          ["Безопасность", LockKeyhole, "green"],
-                          ["Оформление", Palette, "gray"],
-                          ["Шрифты", Type, "blue"],
-                        ],
-                        [
-                          ["Папки с чатами", Folder, "cyan"],
-                          ["Производительность", Zap, "green"],
-                          ["Хранилище", HardDrive, "orange"],
-                          ["О приложении", Info, "purple"],
-                          ["Установить приложение", Smartphone, "blue"],
-                        ],
-                      ].map((group, i) => {
-                        const items = group.filter(([name]) =>
-                          (name as string)
-                            .toLowerCase()
-                            .includes(settingsSearch.toLowerCase()),
-                        );
-                        return (
-                          items.length > 0 && (
-                            <section className="settings-group" key={i}>
-                              <h2>
-                                {
-                                  [
-                                    "Аккаунт",
-                                    "Личное пространство",
-                                    "Приложение",
-                                  ][i]
-                                }
-                              </h2>
-                              <div className="settings-list">
-                                {items.map(([name, Icon, color]) => (
-                                  <button
-                                    key={name as string}
-                                    onClick={() => setSetting(name as string)}
-                                  >
-                                    <span className={"setting-icon " + color}>
-                                      <Icon size={20} />
-                                    </span>
-                                    <span>{name as string}</span>
-                                    <ChevronRight size={18} />
-                                  </button>
-                                ))}
-                              </div>
-                            </section>
-                          )
-                        );
-                      })}
-                    </div>
-                    <button
-                      className="logout"
-                      onClick={async () => {
+                <div
+                  className={
+                    "settings-screen " + (setting ? "has-section" : "")
+                  }
+                >
+                  <header className="settings-heading">
+                    <PageHeading title="Настройки" />
+                  </header>
+                  <div className="settings-layout">
+                    <SettingsMenu
+                      avatar={<Avatar user={user} />}
+                      name={<UserName user={user} />}
+                      username={user.username}
+                      selected={setting}
+                      search={settingsSearch}
+                      onSearch={setSettingsSearch}
+                      onSelect={setSetting}
+                      onProfile={() => nav("profile")}
+                      onLogout={async () => {
                         await api("/logout", send("POST", {}));
                         clearPushPreference();
                         qc.clear();
                         location.reload();
                       }}
+                    />
+                    <section
+                      className="settings-content"
+                      aria-label="Содержимое настроек"
                     >
-                      <LogOut size={17} /> Выйти из аккаунта
-                    </button>
-                  </>
-                )}
+                      {setting ? (
+                        <>
+                          <button
+                            className="back-link"
+                            onClick={() => setSetting("")}
+                          >
+                            <ArrowLeft size={18} /> Все настройки
+                          </button>
+                          {setting === "Установить приложение" ? (
+                            <InstallApp {...installApp} />
+                          ) : setting === "Администрирование" ? (
+                            <Admin owner={user.id === 1} />
+                          ) : setting === "nimb Plus" ? (
+                            <IdentitySettings
+                              key={`${user.id}-${user.plus}`}
+                              user={user}
+                            />
+                          ) : setting === "Аккаунт" ? (
+                            <AccountSettings
+                              edit={() => {
+                                setSetting("");
+                                setTab("profile");
+                                setEditing(true);
+                              }}
+                            />
+                          ) : setting === "Хранилище" ? (
+                            <StorageSettings />
+                          ) : setting === "О приложении" ? (
+                            <AboutSettings />
+                          ) : setting === "Язык" ? (
+                            <LanguageSettings />
+                          ) : setting === "Папки с чатами" ? (
+                            <FolderSettings
+                              chats={chats.data?.chats || []}
+                              userId={user.id}
+                            />
+                          ) : setting === "Уведомления" ? (
+                            <NotificationSettings />
+                          ) : [
+                              "Шрифты",
+                              "Оформление",
+                              "Производительность",
+                            ].includes(setting) ? (
+                            <Preferences section={setting} />
+                          ) : setting === "Конфиденциальность" ? (
+                            <PrivacySettings
+                              user={user}
+                              onUpdate={(u) =>
+                                qc.setQueryData(
+                                  ["me"],
+                                  (
+                                    old:
+                                      | { user: User; isAdmin?: boolean }
+                                      | undefined,
+                                  ) => ({ ...old, user: u }),
+                                )
+                              }
+                            />
+                          ) : ["Безопасность", "Устройства"].includes(
+                              setting,
+                            ) ? (
+                            <SecuritySettings section={setting} />
+                          ) : (
+                            <div className="setting-detail">
+                              <h2>{setting}</h2>
+                              <p>В разработке</p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <SettingsOverview
+                            avatar={<Avatar user={user} size="large" />}
+                            name={<UserName user={user} />}
+                            username={user.username}
+                            onSelect={setSetting}
+                          />
+                          {me.data?.isAdmin && (
+                            <button
+                              className="admin-entry"
+                              onClick={() => nav("admin")}
+                            >
+                              <span className="admin-entry-icon">
+                                <Shield size={20} />
+                              </span>
+                              <span>
+                                <strong>Панель администратора</strong>
+                                <small>Пользователи, подарки и жалобы</small>
+                              </span>
+                              <ChevronRight size={19} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </section>
+                  </div>
+                </div>
               </>
             )}
           </motion.div>
@@ -1938,63 +1928,69 @@ function Profile({
             </>
           )}
         </div>
-        <div className="profile-identity">
-          <Avatar user={user} size="large" />
-          <div className="profile-title">
-            <h1>
-              <UserName user={user} />
-            </h1>
-            <span>@{user.username}</span>
-            {user.online !== undefined && user.online !== null && (
-              <small className="profile-status">
-                {user.online ? "В сети" : "Не в сети"}
-              </small>
+        <div className="profile-overview">
+          <div className="profile-hero">
+            <div className="profile-identity">
+              <Avatar user={user} size="large" />
+              <div className="profile-title">
+                <h1>
+                  <UserName user={user} />
+                </h1>
+                <span>@{user.username}</span>
+                {user.online !== undefined && user.online !== null && (
+                  <small className="profile-status">
+                    {user.online ? "В сети" : "Не в сети"}
+                  </small>
+                )}
+              </div>
+              <div className="profile-quick-actions">
+                {own ? (
+                  <button className="outline compact-button" onClick={onEdit}>
+                    <Pencil size={16} />
+                    <span>Редактировать</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="icon-button"
+                      aria-label="Другие действия"
+                      onClick={() => setActionsOpen(!actionsOpen)}
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label="Подарить подарок"
+                      onClick={() => {
+                        setProfileTab("gifts");
+                        setGiftOpen(true);
+                      }}
+                    >
+                      <Gift size={20} />
+                    </button>
+                    <button className="primary" onClick={onMessage}>
+                      <MessageCircle size={17} /> Написать
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {user.bio && <p className="profile-bio">{user.bio}</p>}
+            {user.bioPrivate && !own && (
+              <p className="muted profile-bio">Описание скрыто владельцем.</p>
             )}
           </div>
-          <div className="profile-quick-actions">
-            {own ? (
-              <button className="outline compact-button" onClick={onEdit}>
-                <Pencil size={16} />
-                <span>Редактировать</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  className="icon-button"
-                  aria-label="Другие действия"
-                  onClick={() => setActionsOpen(!actionsOpen)}
-                >
-                  <MoreHorizontal size={20} />
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Подарить подарок"
-                  onClick={() => {
-                    setProfileTab("gifts");
-                    setGiftOpen(true);
-                  }}
-                >
-                  <Gift size={20} />
-                </button>
-                <button className="primary" onClick={onMessage}>
-                  <MessageCircle size={17} /> Написать
-                </button>
-              </>
-            )}
+          <div className="profile-details">
+            <ProfileIdentifiers user={user} />
+            <div className="profile-meta">
+              <span>
+                <Hash size={15} /> ID {user.id}
+              </span>
+              <span>
+                <CalendarDays size={15} /> С {date(user.createdAt)}
+              </span>
+            </div>
           </div>
-        </div>
-        {user.bio && <p className="profile-bio">{user.bio}</p>}
-        {user.bioPrivate && !own && (
-          <p className="muted profile-bio">Описание скрыто владельцем.</p>
-        )}
-        <ProfileIdentifiers user={user} />
-        <div className="profile-meta">
-          <span>
-            <Hash size={15} /> ID {user.id}
-          </span>
-          <span>
-            <CalendarDays size={15} /> С {date(user.createdAt)}
-          </span>
         </div>
       </section>
       {shareNotice && (

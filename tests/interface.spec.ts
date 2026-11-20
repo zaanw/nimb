@@ -105,7 +105,7 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
       .querySelector(".composer")!
       .getBoundingClientRect();
     return {
-      adjacent: Math.abs(list.right - chat.left) < 2,
+      adjacent: chat.left >= list.right && chat.left - list.right <= 12,
       wide: chat.width > 650,
       visibleComposer: composer.bottom <= innerHeight,
       overflow: document.documentElement.scrollWidth > innerWidth,
@@ -200,6 +200,101 @@ test("ordinary accounts have no administration entry in navigation, profile or s
     page.getByRole("heading", { name: "Настройки", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".admin-entry")).toHaveCount(0);
+});
+
+test("settings keep desktop navigation and switch to a back button on phones", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await fixture(page);
+  await page
+    .locator(".side-utilities")
+    .getByRole("button", { name: "Настройки", exact: true })
+    .click();
+  const menu = page.getByRole("complementary", { name: "Разделы настроек" });
+  await menu.getByRole("button", { name: "Шрифты", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Шрифты", exact: true }),
+  ).toBeVisible();
+  await expect(menu).toBeVisible();
+  await page.getByLabel("Шрифт", { exact: true }).selectOption("Rubik");
+  await page.evaluate(() => document.fonts.ready);
+  expect(
+    await page.evaluate(() => document.fonts.check("14px Rubik")),
+  ).toBeTruthy();
+  await menu.getByRole("button", { name: "Оформление", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Оформление", exact: true }),
+  ).toBeVisible();
+  await expect(menu).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(menu).toBeHidden();
+  await page
+    .getByRole("button", { name: "Все настройки", exact: true })
+    .click();
+  await expect(menu).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Оформление", exact: true }),
+  ).toBeVisible();
+});
+
+test("illustrated gift details show actual ownership and preserve the pin action", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, false);
+  await page.route("**/api/users/1/gifts", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        gifts: [
+          {
+            id: 42,
+            template: "moon",
+            name: "Луна",
+            icon: "☾",
+            rarity: "Особенный",
+            color: "mint",
+            description: "Маленький свет в ночи.",
+            ownerId: 1,
+            pinned: false,
+            receivedAt: "2026-11-20T12:00:00Z",
+            sender: { name: "Алексей", username: "alex" },
+          },
+        ],
+      }),
+    }),
+  );
+  let pin: unknown;
+  await page.route("**/api/gifts/42/pin", async (route) => {
+    pin = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: "application/json",
+      body: '{"ok":true}',
+    });
+  });
+  await page
+    .locator(".mobile-nav")
+    .getByRole("button", { name: "Профиль", exact: true })
+    .click();
+  await expect(page.locator(".gift-tile .gift-artwork")).toBeVisible();
+  await page.locator(".gift-tile").click();
+  const detail = page.getByRole("dialog", { name: "Луна", exact: true });
+  await expect(detail.locator(".gift-artwork")).toBeVisible();
+  await expect(detail.locator(".gift-facts")).toContainText("#42");
+  await expect(detail.locator(".gift-facts")).toContainText("ID 1");
+  await expect(detail.locator(".gift-facts")).toContainText("@alex");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({ path: "/tmp/nimb-ref-phone-gift.png" });
+  await detail
+    .getByRole("button", { name: "Закрепить в профиле", exact: true })
+    .click();
+  await expect(detail).toBeHidden();
+  expect(pin).toEqual({ pinned: true });
 });
 
 test("wallet requires confirmation and Escape cancels without purchasing", async ({

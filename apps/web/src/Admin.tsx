@@ -1,3 +1,4 @@
+import { GiftArtwork } from "./GiftArtwork";
 import { NetworkBans } from "./NetworkBans";
 import { ReclaimAssets } from "./ReclaimAssets";
 import { StatRollback } from "./StatRollback";
@@ -394,13 +395,17 @@ function GrantDialog({
               <Icon size={26} />
             </span>
             <strong>
-              {kind === "currency"
-                ? `+${number(Number(value))}`
-                : kind === "username"
-                  ? value.startsWith("+")
-                    ? value
-                    : `@${value}`
-                  : chosenGift?.icon}
+              {kind === "currency" ? (
+                `+${number(Number(value))}`
+              ) : kind === "username" ? (
+                value.startsWith("+") ? (
+                  value
+                ) : (
+                  `@${value}`
+                )
+              ) : chosenGift ? (
+                <GiftArtwork template={chosenGift.id} />
+              ) : null}
             </strong>
             <span>
               {kind === "currency"
@@ -472,7 +477,7 @@ function GrantDialog({
                       key={g.id}
                       onClick={() => setValue(g.id)}
                     >
-                      <span>{g.icon}</span>
+                      <GiftArtwork template={g.id} />
                       <strong>{g.name}</strong>
                       <small>{g.rarity}</small>
                       {value === g.id && <Check size={14} />}
