@@ -155,7 +155,7 @@ async function adminFixture(page: Page) {
       .getByRole("button", { name: /Админ-панель/ })
       .click();
   await expect(
-    page.getByRole("heading", { name: "Админ-панель." }),
+    page.getByRole("heading", { name: "Админ-панель", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Управлять @test" }),

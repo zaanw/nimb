@@ -81,6 +81,7 @@ test("wallet visibility controls publish only the selected collectible", async (
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let visible = false;
+  let rejectNextVisibilityChange = false;
   const user = {
     id: 2,
     username: "kent",
@@ -110,6 +111,13 @@ test("wallet visibility controls publish only the selected collectible", async (
     else if (p === "/api/wallet/visibility") {
       const body = route.request().postDataJSON();
       expect(body.username).toBe("ladesev");
+      if (rejectNextVisibilityChange) {
+        await route.fulfill({
+          status: 409,
+          json: { error: "Изменение не сохранено" },
+        });
+        return;
+      }
       visible = body.visible;
     } else if (p.endsWith("/identifiers"))
       data = { names: visible ? ["kent", "ladesev"] : ["kent"], numbers: [] };
@@ -149,4 +157,14 @@ test("wallet visibility controls publish only the selected collectible", async (
     .getByRole("button", { name: "Профиль", exact: true })
     .click();
   await expect(page.locator(".profile-also")).toHaveCount(0);
+  await page
+    .locator(".mobile-nav")
+    .getByRole("button", { name: "Кошелёк", exact: true })
+    .click();
+  rejectNextVisibilityChange = true;
+  await toggle.click();
+  await expect(page.getByRole("alert")).toContainText("Изменение не сохранено");
+  await expect(toggle).not.toBeChecked();
+  await expect(toggle).toBeEnabled();
+  expect(visible).toBe(false);
 });

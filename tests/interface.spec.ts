@@ -8,6 +8,7 @@ async function fixture(page: Page, isAdmin = true, secondChat = false) {
     name: "Владелец",
     username: "owner",
     bio: "",
+    links: [{ label: "Сайт сообщества", url: "https://example.com/nimb" }],
     createdAt: "2026-11-15T10:00:00Z",
   };
   const friend = { ...user, id: 2, name: "Собеседник", username: "friend" };
@@ -174,6 +175,13 @@ test("feed, profile, wallet and settings fit small phones, tablets and large des
         ),
         `${width}px: ${tab}`,
       ).toBeTruthy();
+      if (heading === "Мой профиль") {
+        await expect(
+          page
+            .locator(".profile-details")
+            .getByRole("link", { name: "Сайт сообщества" }),
+        ).toHaveAttribute("href", "https://example.com/nimb");
+      }
     }
   }
   expect(errors).toEqual([]);
@@ -557,4 +565,88 @@ test("Telegram gift posters stay inside three-column cards at phone and desktop 
     await expect(detail).toBeHidden();
   }
   await expect(page.locator(".gift-animation")).toHaveCount(0);
+});
+
+test("desktop menu expands, preserves the current conversation and closes after navigation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await fixture(page);
+  await page.locator(".chat-list-item").click();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Развернуть меню", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Свернуть меню", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.locator(".sidebar nav").getByText("Сообщения", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
+  await page
+    .locator(".sidebar nav")
+    .getByRole("button", { name: "Кошелёк", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Кошелёк", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Развернуть меню", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await page
+    .locator(".sidebar nav")
+    .getByRole("button", { name: "Сообщения", exact: true })
+    .click();
+  await expect(page.locator(".conversation-list")).toBeVisible();
+  await page.locator(".chat-list-item").click();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
+});
+
+test("wallet filters owned names and numbers without changing ownership or active addresses", async ({
+  page,
+}) => {
+  await fixture(page);
+  const mutations: string[] = [];
+  await page.route("**/api/wallet**", async (route) => {
+    if (route.request().method() !== "GET")
+      mutations.push(route.request().url());
+    await route.fulfill({
+      json: {
+        balance: 8000,
+        username: "owner",
+        collectibleNumber: "+666",
+        owned: [
+          {
+            username: "neo",
+            price: 1000,
+            public: true,
+            purchasedAt: "2026-11-15T10:00:00Z",
+          },
+          {
+            username: "+666",
+            price: 1000,
+            public: true,
+            purchasedAt: "2026-11-15T10:00:00Z",
+          },
+        ],
+      },
+    });
+  });
+  await page
+    .locator(".sidebar nav")
+    .getByRole("button", { name: "Кошелёк", exact: true })
+    .click();
+  await expect(page.locator(".wallet-ownership-item")).toHaveCount(2);
+  const tabs = page.getByRole("tablist", { name: "Коллекция адресов" });
+  await tabs.getByRole("tab", { name: "Номера", exact: true }).click();
+  await expect(page.locator(".wallet-ownership-item")).toHaveCount(1);
+  await expect(page.locator(".wallet-owned")).toContainText("+666");
+  await expect(page.locator(".wallet-public-option input")).toBeDisabled();
+  await tabs.getByRole("tab", { name: "Имена", exact: true }).click();
+  await expect(page.locator(".wallet-owned")).toContainText("@neo");
+  await expect(page.locator(".wallet-public-option input")).toBeChecked();
+  await tabs.getByRole("tab", { name: "Все", exact: true }).click();
+  await expect(page.locator(".wallet-ownership-item")).toHaveCount(2);
+  expect(mutations).toEqual([]);
 });

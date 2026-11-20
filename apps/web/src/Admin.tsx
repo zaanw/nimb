@@ -693,94 +693,12 @@ export function Admin({ owner = false }: { owner?: boolean }) {
   return (
     <section className="admin-console">
       <header className="control-heading">
-        <div className="control-heading-art" aria-hidden="true">
-          <svg viewBox="0 0 400 240" fill="none">
-            <defs>
-              <linearGradient
-                id="admin-orbit"
-                x1="90"
-                y1="24"
-                x2="290"
-                y2="225"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop stopColor="#f3d7a7" />
-                <stop offset=".45" stopColor="#a18b68" />
-                <stop offset="1" stopColor="#3c5360" />
-              </linearGradient>
-              <linearGradient
-                id="admin-medal"
-                x1="159"
-                y1="65"
-                x2="249"
-                y2="187"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop stopColor="#41525a" />
-                <stop offset=".55" stopColor="#25343e" />
-                <stop offset="1" stopColor="#151e26" />
-              </linearGradient>
-            </defs>
-            <ellipse
-              cx="210"
-              cy="124"
-              rx="158"
-              ry="59"
-              transform="rotate(-31 210 124)"
-              stroke="url(#admin-orbit)"
-              strokeOpacity=".5"
-            />
-            <ellipse
-              cx="210"
-              cy="124"
-              rx="143"
-              ry="85"
-              transform="rotate(34 210 124)"
-              stroke="#76919f"
-              strokeOpacity=".2"
-            />
-            <circle
-              cx="210"
-              cy="124"
-              r="94"
-              stroke="#d0b484"
-              strokeOpacity=".12"
-              strokeDasharray="2 8"
-            />
-            <circle
-              cx="210"
-              cy="124"
-              r="64"
-              fill="url(#admin-medal)"
-              stroke="url(#admin-orbit)"
-            />
-            <circle
-              cx="210"
-              cy="124"
-              r="57"
-              stroke="#e6cdab"
-              strokeOpacity=".1"
-            />
-            <path
-              d="M188 146V102M188 123c0-17 8-25 21-25s22 8 22 22v26"
-              stroke="#ead6b8"
-              strokeWidth="9"
-              strokeLinecap="round"
-            />
-            <circle cx="244" cy="94" r="4.5" fill="#ebca93" />
-            <circle cx="330" cy="52" r="4" fill="#e3bf87" />
-            <circle cx="83" cy="119" r="3" fill="#7b9aaa" />
-            <circle cx="286" cy="209" r="2" fill="#bca77f" />
-          </svg>
-        </div>
         <div className="control-heading-copy">
           <div className="control-breadcrumb">
             <Shield size={13} />
             NIMB<span>/</span>УПРАВЛЕНИЕ
           </div>
-          <h1>
-            Админ-панель<span>.</span>
-          </h1>
+          <h1>Админ-панель</h1>
           <p>Люди, награды и всё, что происходит в nimb.</p>
         </div>
         <button

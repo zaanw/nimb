@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { io, type Socket } from "socket.io-client";
 import {
+  Menu,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -203,6 +204,7 @@ function App() {
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   });
   const [tab, setTab] = useState("chats");
+  const [navigationExpanded, setNavigationExpanded] = useState(false);
   const [selected, setSelected] = useState<Chat | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
@@ -661,6 +663,7 @@ function App() {
           }
         : undefined;
   function nav(t: string) {
+    setNavigationExpanded(false);
     window.scrollTo(0, 0);
     if (mainRef.current) mainRef.current.scrollTop = 0;
     setWalletOpen(t === "wallet");
@@ -695,11 +698,33 @@ function App() {
     <div
       className={
         "shell " +
+        (navigationExpanded ? "navigation-expanded " : "") +
         (messenger ? "messenger-shell" : "") +
         (messenger && (selected || profile) ? " conversation-open" : "")
       }
     >
       <header className="app-topbar">
+        <button
+          className="icon-button navigation-toggle"
+          aria-label={navigationExpanded ? "Свернуть меню" : "Развернуть меню"}
+          aria-expanded={navigationExpanded}
+          onClick={() => setNavigationExpanded((value) => !value)}
+        >
+          <Menu size={21} />
+        </button>
+        <button
+          className="topbar-account"
+          aria-label="Открыть мой профиль"
+          onClick={() => nav("profile")}
+        >
+          <Avatar user={user} />
+          <span>
+            <strong>
+              <UserName user={user} />
+            </strong>
+            <small>@{user.username}</small>
+          </span>
+        </button>
         <button
           className="topbar-brand"
           onClick={() => nav("chats")}
@@ -707,8 +732,6 @@ function App() {
         >
           <Brand />
         </button>
-        <span className="topbar-divider" />
-        <span className="topbar-caption">Место для своих</span>
         <div className="topbar-actions">
           <button
             className="outline topbar-create"
@@ -723,19 +746,6 @@ function App() {
             onClick={() => nav("settings")}
           >
             <Settings size={19} />
-          </button>
-          <button
-            className="topbar-account"
-            aria-label="Открыть мой профиль"
-            onClick={() => nav("profile")}
-          >
-            <Avatar user={user} />
-            <span>
-              <strong>
-                <UserName user={user} />
-              </strong>
-              <small>@{user.username}</small>
-            </span>
           </button>
         </div>
       </header>
@@ -773,7 +783,12 @@ function App() {
             </button>
           )}
         </div>
-        <button className="side-bottom" onClick={() => nav("profile")}>
+        <button
+          className="side-bottom"
+          aria-label="Мой аккаунт"
+          title="Мой профиль"
+          onClick={() => nav("profile")}
+        >
           <Avatar user={user} />
           <span>
             <strong>
@@ -1982,6 +1997,7 @@ function Profile({
           </div>
           <div className="profile-details">
             <ProfileIdentifiers user={user} />
+            <ProfileLinks user={user} />
             <div className="profile-meta">
               <span>
                 <Hash size={15} /> ID {user.id}
@@ -2011,20 +2027,6 @@ function Profile({
       )}
       <div className="profile-columns">
         <aside className="profile-about">
-          <section className="profile-about-card">
-            <h2>О профиле</h2>
-            <dl>
-              <div>
-                <dt>Юзернейм</dt>
-                <dd>@{user.username}</dd>
-              </div>
-              <div>
-                <dt>Номер аккаунта</dt>
-                <dd>#{user.id}</dd>
-              </div>
-            </dl>
-            <ProfileLinks user={user} />
-          </section>
           <Collections userId={user.id} own={own} section="badges" />
           <ProfileMusic user={user} own={own} />
         </aside>

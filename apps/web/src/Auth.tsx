@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, MessageCircle, AtSign } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Brand } from "./UI";
 type Mode = "login" | "register" | "verify" | "forgot" | "reset" | "resend";
 export function Auth() {
@@ -112,24 +112,6 @@ export function Auth() {
         <span>МЕСТО ДЛЯ СВОИХ</span>
       </header>
       <div className="auth-grid">
-        <section className="auth-intro">
-          <span className="eyebrow">ПРОСТО БУДЬТЕ НА СВЯЗИ</span>
-          <h1>
-            Ваши люди.
-            <br />
-            Ваши разговоры.
-            <br />
-            Ваш nimb.
-          </h1>
-          <p>
-            Переписывайтесь, делитесь моментами и собирайте своё сообщество.
-          </p>
-          <div className="auth-drawing" aria-hidden="true">
-            <AtSign />
-            <span />
-            <MessageCircle />
-          </div>
-        </section>
         <section className="auth-card">
           <h2>
             {title}
@@ -200,9 +182,7 @@ export function Auth() {
                 />
               </label>
             )}
-            {mode === "register" && (
-              <p>Сохраните пароль: восстановление доступа пока недоступно.</p>
-            )}
+            {mode === "register" && <p>Сохраните пароль в надёжном месте.</p>}
             {error && <div className="error">{error}</div>}
             {notice && <div className="notice">{notice}</div>}
             <button className="primary" disabled={busy}>

@@ -46,6 +46,13 @@ export function Wallet({ onBack }: { onBack: () => void }) {
   const qc = useQueryClient();
   const { ask, dialog } = useConfirmation();
   const [name, setName] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState<
+    "all" | "names" | "numbers"
+  >("all");
+  const [pendingVisibility, setPendingVisibility] = useState<{
+    username: string;
+    visible: boolean;
+  } | null>(null);
   const [checked, setChecked] = useState<CheckResult | null>(null);
   const [notice, setNotice] = useState("");
   const wallet = useQuery({
@@ -94,8 +101,12 @@ export function Wallet({ onBack }: { onBack: () => void }) {
       return data;
     },
     onSuccess: async () => {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["wallet"] }),qc.invalidateQueries({ queryKey: ["identifiers"] })]);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["wallet"] }),
+        qc.invalidateQueries({ queryKey: ["identifiers"] }),
+      ]);
     },
+    onSettled: () => setPendingVisibility(null),
   });
   function checkName(e: React.FormEvent) {
     e.preventDefault();
@@ -130,6 +141,14 @@ export function Wallet({ onBack }: { onBack: () => void }) {
       action.mutate({ path: "/buy", username: selected.username });
   }
   const balance = wallet.data?.balance ?? 0;
+  const owned = wallet.data?.owned || [];
+  const visibleOwned = owned.filter(
+    (item) =>
+      collectionFilter === "all" ||
+      (collectionFilter === "numbers"
+        ? item.username.startsWith("+")
+        : !item.username.startsWith("+")),
+  );
   return (
     <div className="wallet-screen">
       <PageHeading
@@ -195,82 +214,122 @@ export function Wallet({ onBack }: { onBack: () => void }) {
                 {wallet.data?.owned.length ?? "—"}
               </span>
             </div>
+            <div
+              className="wallet-collection-tabs"
+              role="tablist"
+              aria-label="Коллекция адресов"
+            >
+              {(
+                [
+                  ["all", "Все"],
+                  ["names", "Имена"],
+                  ["numbers", "Номера"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={collectionFilter === key}
+                  onClick={() => setCollectionFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             {wallet.isLoading ? (
               <p className="muted">Загрузка коллекции…</p>
             ) : wallet.isError ? (
               <p>Коллекция временно недоступна.</p>
             ) : wallet.data?.owned.length ? (
-              wallet.data.owned.map((item) => (
-                <div className="wallet-ownership-item" key={item.username}>
-                  <div className="wallet-owned">
-                    <span className="wallet-owned-icon">
-                      <AtSign size={17} />
-                    </span>
-                    <span>
-                      <strong>{labelName(item.username)}</strong>
-                      <small>
-                        В коллекции с{" "}
-                        {new Date(item.purchasedAt).toLocaleDateString("ru-RU")}
-                      </small>
-                    </span>
-                    {wallet.data?.username === item.username ||
-                    wallet.data?.collectibleNumber === item.username ? (
-                      <span className="status-pill">
-                        <Check size={11} /> Активен
+              <div className="wallet-ownership-grid">
+                {visibleOwned.map((item) => (
+                  <div className="wallet-ownership-item" key={item.username}>
+                    <div className="wallet-owned">
+                      <span className="wallet-owned-icon">
+                        {item.username.startsWith("+") ? (
+                          <Hash size={24} />
+                        ) : (
+                          <AtSign size={24} />
+                        )}
                       </span>
-                    ) : (
-                      <button
-                        className="outline"
-                        disabled={action.isPending}
-                        onClick={async () => {
-                          if (
-                            await ask({
-                              title: `Выбрать ${labelName(item.username)}?`,
-                              description: item.username.startsWith("+")
-                                ? "Номер появится в профиле. Имя пользователя останется прежним."
-                                : `Это станет вашим текущим именем. ${wallet.data?.owned.some((n) => n.username === wallet.data?.username) ? "Прежнее имя останется в коллекции." : "Прежнее обычное имя освободится."}`,
-                              label: "Выбрать",
-                            })
-                          )
-                            action.mutate({
-                              path: "/activate",
-                              username: item.username,
-                            });
-                        }}
-                      >
-                        Выбрать
-                      </button>
-                    )}
-                  </div>
-                  <label className="wallet-public-option">
-                    <input
-                      type="checkbox"
-                      checked={
-                        wallet.data?.username === item.username ||
-                        wallet.data?.collectibleNumber === item.username ||
-                        (visibility.isPending && visibility.variables?.username===item.username ? visibility.variables.visible : !!item.public)
-                      }
-                      disabled={
-                        visibility.isPending ||
-                        wallet.data?.username === item.username ||
-                        wallet.data?.collectibleNumber === item.username
-                      }
-                      onChange={(e) =>
-                        visibility.mutate({
-                          username: item.username,
-                          visible: e.target.checked,
-                        })
-                      }
-                    />
-                    <span>
+                      <span>
+                        <strong>{labelName(item.username)}</strong>
+                        <small>
+                          В коллекции с{" "}
+                          {new Date(item.purchasedAt).toLocaleDateString(
+                            "ru-RU",
+                          )}
+                        </small>
+                      </span>
                       {wallet.data?.username === item.username ||
-                      wallet.data?.collectibleNumber === item.username
-                        ? "Основной адрес · виден в профиле"
-                        : "Показывать в профиле"}
-                    </span>
-                  </label>
-                </div>
-              ))
+                      wallet.data?.collectibleNumber === item.username ? (
+                        <span className="status-pill">
+                          <Check size={11} /> Активен
+                        </span>
+                      ) : (
+                        <button
+                          className="outline"
+                          disabled={action.isPending}
+                          onClick={async () => {
+                            if (
+                              await ask({
+                                title: `Выбрать ${labelName(item.username)}?`,
+                                description: item.username.startsWith("+")
+                                  ? "Номер появится в профиле. Имя пользователя останется прежним."
+                                  : `Это станет вашим текущим именем. ${wallet.data?.owned.some((n) => n.username === wallet.data?.username) ? "Прежнее имя останется в коллекции." : "Прежнее обычное имя освободится."}`,
+                                label: "Выбрать",
+                              })
+                            )
+                              action.mutate({
+                                path: "/activate",
+                                username: item.username,
+                              });
+                          }}
+                        >
+                          Выбрать
+                        </button>
+                      )}
+                    </div>
+                    <label className="wallet-public-option">
+                      <input
+                        type="checkbox"
+                        checked={
+                          wallet.data?.username === item.username ||
+                          wallet.data?.collectibleNumber === item.username ||
+                          (pendingVisibility?.username === item.username
+                            ? pendingVisibility.visible
+                            : !!item.public)
+                        }
+                        disabled={
+                          !!pendingVisibility ||
+                          visibility.isPending ||
+                          wallet.data?.username === item.username ||
+                          wallet.data?.collectibleNumber === item.username
+                        }
+                        onChange={(e) => {
+                          const change = {
+                            username: item.username,
+                            visible: e.target.checked,
+                          };
+                          setPendingVisibility(change);
+                          visibility.mutate(change);
+                        }}
+                      />
+                      <span>
+                        {wallet.data?.username === item.username ||
+                        wallet.data?.collectibleNumber === item.username
+                          ? "Основной адрес · виден в профиле"
+                          : "Показывать в профиле"}
+                      </span>
+                    </label>
+                  </div>
+                ))}
+                {!visibleOwned.length && (
+                  <p className="wallet-filter-empty">
+                    В этом разделе пока нет адресов.
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="wallet-empty">
                 <AtSign size={28} strokeWidth={1.3} />
