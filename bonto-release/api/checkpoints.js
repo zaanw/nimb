@@ -1,3 +1,4 @@
+import { editionForGift } from "./collectibles.js";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { lockName } from "./identity.js";
@@ -370,16 +371,19 @@ export function registerCheckpoints(app, db, auth, notify) {
                 },
             });
             for (const g of target.gifts) {
+                const edition = await editionForGift(tx, g.id, g.template);
                 await tx.gift.upsert({
                     where: { id: g.id },
                     create: {
                         id: g.id,
+                        editionId: edition.id,
                         ownerId: id,
                         template: g.template,
                         pinned: g.pinned,
                         receivedAt: new Date(g.receivedAt),
                     },
                     update: {
+                        editionId: edition.id,
                         template: g.template,
                         pinned: g.pinned,
                         receivedAt: new Date(g.receivedAt),

@@ -18,9 +18,11 @@ const artwork: Record<string, string> = {
 export function GiftArtwork({
   template,
   animate = false,
+  lazy = false,
 }: {
   template: string;
   animate?: boolean;
+  lazy?: boolean;
 }) {
   const asset = artwork[template];
   const container = useRef<HTMLDivElement>(null);
@@ -113,6 +115,7 @@ export function GiftArtwork({
           aria-hidden="true"
           draggable={false}
           decoding="async"
+          loading={lazy ? "lazy" : "eager"}
           onError={() => setFailed(true)}
         />
       ) : (

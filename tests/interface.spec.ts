@@ -1,3 +1,4 @@
+import { openNavigation, navigate } from "./navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { gifts } from "../apps/api/src/catalog";
 
@@ -156,16 +157,7 @@ test("feed, profile, wallet and settings fit small phones, tablets and large des
       ["Кошелёк", "Кошелёк"],
       ["Настройки", "Настройки"],
     ]) {
-      const nav =
-        width <= 760
-          ? ".mobile-nav"
-          : tab === "Настройки"
-            ? ".side-utilities"
-            : ".sidebar nav";
-      await page
-        .locator(nav)
-        .getByRole("button", { name: tab, exact: true })
-        .click();
+      await navigate(page, tab);
       await expect(
         page.getByRole("heading", { name: heading, exact: true }),
       ).toBeVisible();
@@ -195,12 +187,14 @@ test("ordinary accounts have no administration entry in navigation, profile or s
   await expect(page.getByRole("button", { name: /Админ-панель/ })).toHaveCount(
     0,
   );
+  await openNavigation(page);
   await page
     .locator(".sidebar nav")
     .getByRole("button", { name: "Мой профиль", exact: true })
     .click();
   await expect(page.locator(".profile-identity")).toBeVisible();
   await expect(page.locator(".profile-admin-link")).toHaveCount(0);
+  await openNavigation(page);
   await page
     .locator(".side-utilities")
     .getByRole("button", { name: "Настройки", exact: true })
@@ -216,6 +210,7 @@ test("settings keep desktop navigation and switch to a back button on phones", a
 }) => {
   await page.setViewportSize({ width: 1440, height: 950 });
   await fixture(page);
+  await openNavigation(page);
   await page
     .locator(".side-utilities")
     .getByRole("button", { name: "Настройки", exact: true })
@@ -330,10 +325,7 @@ test("wallet requires confirmation and Escape cancels without purchasing", async
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = await fixture(page);
-  await page
-    .locator(".mobile-nav")
-    .getByRole("button", { name: "Кошелёк", exact: true })
-    .click();
+  await navigate(page, "Кошелёк");
   await page.getByLabel("Юзернейм или номер").fill("777");
   await page.getByRole("button", { name: "Проверить", exact: true }).click();
   await page.getByRole("button", { name: "Купить", exact: true }).click();
@@ -490,7 +482,7 @@ test("drafts survive a reload and remain separate between conversations", async 
   await expect(page.getByLabel("Сообщение", { exact: true })).toHaveValue("");
 });
 
-test("Telegram gift posters stay inside three-column cards at phone and desktop sizes", async ({
+test("Telegram gift posters fit responsive profile grids and keep their animations", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -545,7 +537,10 @@ test("Telegram gift posters stay inside three-column cards at phone and desktop 
       String(width),
     ).toBeTruthy();
     expect(
-      boxes[0].right <= boxes[1].left && boxes[1].right <= boxes[2].left,
+      boxes[0].right <= boxes[1].left &&
+        (width > 760 && width <= 1100
+          ? boxes[2].left < boxes[1].left
+          : boxes[1].right <= boxes[2].left),
       String(width),
     ).toBeTruthy();
     expect(
@@ -567,7 +562,7 @@ test("Telegram gift posters stay inside three-column cards at phone and desktop 
   await expect(page.locator(".gift-animation")).toHaveCount(0);
 });
 
-test("desktop menu expands, preserves the current conversation and closes after navigation", async ({
+test("desktop navigation keeps its width choice and the open conversation", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 950 });
@@ -575,30 +570,23 @@ test("desktop menu expands, preserves the current conversation and closes after 
   await page.locator(".chat-list-item").click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
   await page
+    .getByRole("button", { name: "Свернуть меню", exact: true })
+    .click();
+  await expect(
+    page.locator(".sidebar nav").getByText("Сообщения", { exact: true }),
+  ).toBeHidden();
+  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
+  await page
     .getByRole("button", { name: "Развернуть меню", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Свернуть меню", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
-  await expect(
     page.locator(".sidebar nav").getByText("Сообщения", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
-  await page
-    .locator(".sidebar nav")
-    .getByRole("button", { name: "Кошелёк", exact: true })
-    .click();
+  await navigate(page, "Кошелёк");
   await expect(
-    page.getByRole("heading", { name: "Кошелёк", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Развернуть меню", exact: true }),
-  ).toHaveAttribute("aria-expanded", "false");
-  await page
-    .locator(".sidebar nav")
-    .getByRole("button", { name: "Сообщения", exact: true })
-    .click();
-  await expect(page.locator(".conversation-list")).toBeVisible();
+    page.getByRole("button", { name: "Свернуть меню", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await navigate(page, "Сообщения");
   await page.locator(".chat-list-item").click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
 });
@@ -633,6 +621,7 @@ test("wallet filters owned names and numbers without changing ownership or activ
       },
     });
   });
+  await openNavigation(page);
   await page
     .locator(".sidebar nav")
     .getByRole("button", { name: "Кошелёк", exact: true })

@@ -54,10 +54,12 @@ export function Dialog({
   title,
   children,
   onClose,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -75,7 +77,7 @@ export function Dialog({
       }
       if (e.key === "Tab") {
         const focusable = node?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
+          'a[href],button:not(:disabled),input:not(:disabled):not([type="hidden"]),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
         );
         if (!focusable?.length) return;
         const first = focusable[0],
@@ -106,7 +108,7 @@ export function Dialog({
       <div
         ref={panel}
         tabIndex={-1}
-        className="modal confirm-dialog"
+        className={"modal confirm-dialog " + className}
         role="dialog"
         aria-modal="true"
         aria-label={title}

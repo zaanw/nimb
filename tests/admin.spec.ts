@@ -1,3 +1,4 @@
+import { openNavigation } from "./navigation";
 import { test, expect, type Page } from "@playwright/test";
 
 async function adminFixture(page: Page) {
@@ -149,11 +150,13 @@ async function adminFixture(page: Page) {
       .getByRole("button", { name: "Профиль", exact: true })
       .click();
     await page.locator(".profile-admin-link").click();
-  } else
+  } else {
+    await openNavigation(page);
     await page
       .locator(".side-utilities")
       .getByRole("button", { name: /Админ-панель/ })
       .click();
+  }
   await expect(
     page.getByRole("heading", { name: "Админ-панель", exact: true }),
   ).toBeVisible();

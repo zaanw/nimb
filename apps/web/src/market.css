@@ -1,0 +1,910 @@
+/* The market shares the Nimb workspace; only the collectible objects carry color. */
+.market-screen {
+  width: 100%;
+  max-width: 1120px;
+  margin: auto;
+  color: var(--text);
+  background: none;
+  min-width: 0;
+}
+.market-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: auto;
+  padding: 0;
+  margin: 0 0 28px;
+  border: 0;
+}
+.market-header > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.market-header h1 {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.6px;
+  margin: 0;
+}
+.market-back {
+  display: none;
+}
+.market-balance {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.market-balance small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.market-balance > svg {
+  color: var(--muted);
+}
+.market-content {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+.market-tabs {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 0;
+  margin: 0 0 24px;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: none;
+}
+.market-tabs button {
+  padding: 0 0 13px;
+  min-height: 40px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.market-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--text);
+  color: var(--text);
+  background: none;
+}
+.market-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+  min-height: 40px;
+}
+.market-section-head h2 {
+  font-size: 15px;
+  font-weight: 400;
+  margin: 0;
+  color: var(--secondary);
+}
+.market-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 220px;
+  max-width: 55%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--muted);
+}
+.market-search:focus-within {
+  border-color: var(--secondary);
+}
+.market-search input {
+  width: 100%;
+  min-width: 0;
+  outline: 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 12px;
+  padding: 0;
+}
+.market-search button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+}
+.market-grid,
+.market-owned-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.market-item {
+  display: block;
+  min-width: 0;
+  padding: 0 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: left;
+  overflow: hidden;
+}
+.market-item:hover {
+  background: var(--raised);
+  border-color: #ffffff26;
+}
+.market-item-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1.14;
+  background: #ffffff02;
+  overflow: hidden;
+}
+.market-item .gift-artwork {
+  width: 82%;
+  height: 82%;
+  max-width: 180px;
+  max-height: 180px;
+  aspect-ratio: 1;
+  margin: 0;
+  filter: none;
+}
+.market-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 14px 0;
+  min-width: 0;
+}
+.market-item-meta strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.market-price {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.market-price > span {
+  display: block;
+  font-size: 9px;
+  color: var(--muted);
+  background: none;
+  width: auto;
+  height: auto;
+}
+.market-empty {
+  padding: 60px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+}
+.market-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #b8d9c5;
+}
+.market-more {
+  display: block;
+  margin: 24px auto 0;
+  font-size: 12px;
+  min-height: 40px;
+}
+.market-purchase-dialog {
+  width: min(420px, calc(100vw - 24px));
+  padding: 28px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  text-align: center;
+}
+.market-purchase-dialog > h2 {
+  font-size: 22px;
+  font-weight: 500;
+  padding: 0;
+  margin: 0;
+}
+.market-purchase-art {
+  display: grid;
+  place-items: center;
+  height: 184px;
+  margin: 16px 0;
+}
+.market-purchase-art .gift-artwork {
+  width: 176px;
+  height: 176px;
+}
+.market-purchase-dialog > p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--secondary);
+}
+.market-purchase-dialog .market-random-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.market-purchase-facts {
+  background: var(--raised);
+  border-radius: 12px;
+  padding: 0 14px;
+  margin: 20px 0;
+  font-size: 13px;
+}
+.market-purchase-facts > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+.market-purchase-facts > div + div {
+  border-top: 1px solid var(--line);
+}
+.market-purchase-facts dt {
+  color: var(--muted);
+}
+.market-purchase-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.market-buy {
+  width: 100%;
+  min-height: 44px;
+  font-size: 13px;
+}
+.market-purchase-dialog .market-insufficient {
+  font-size: 12px;
+  color: var(--danger);
+}
+.market-insufficient button {
+  display: block;
+  margin: 10px auto 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 12px;
+  color: var(--link);
+}
+/* Edition cards have a permanent server-assigned background, pattern and collection serial. */
+.gift-tile.is-collectible,
+.profile-collection .gift-tile.is-collectible {
+  position: relative;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid #ffffff12;
+  border-radius: 25px;
+  overflow: hidden;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    var(--gift-center),
+    var(--gift-edge)
+  ) !important;
+}
+.gift-scene {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    var(--gift-center),
+    var(--gift-edge)
+  );
+}
+.gift-tile.is-collectible .gift-scene {
+  position: absolute;
+  inset: 0;
+}
+.gift-pattern {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.27;
+  color: var(--gift-pattern);
+  mask-image: radial-gradient(ellipse, transparent 2%, #000 75%);
+  pointer-events: none;
+}
+.gift-pattern path {
+  fill: currentColor;
+}
+.gift-scene .gift-artwork,
+.profile-collection .gift-scene .gift-artwork {
+  position: relative;
+  z-index: 1;
+  width: 85%;
+  height: 85%;
+  max-width: 170px;
+  max-height: 170px;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 8px 11px #0002);
+}
+.gift-tile.is-collectible .gift-tile-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  padding: 0;
+  margin: 0;
+}
+.edition-ribbon {
+  position: absolute;
+  z-index: 2;
+  top: 13px;
+  right: -29px;
+  width: 108px;
+  padding: 4px 0;
+  transform: rotate(45deg);
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: color-mix(in srgb, var(--gift-edge) 85%, #fff);
+  text-align: center;
+  box-shadow: 0 1px 1px #0001;
+}
+.gift-pinned {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  background: #0003;
+  border: 1px solid #ffffff40;
+  border-radius: 50%;
+  color: #fff;
+}
+.collectible-dialog {
+  max-width: 430px;
+  width: calc(100vw - 24px);
+  padding: 0 0 16px !important;
+  border: 1px solid #2a2a2a;
+  border-radius: 25px;
+  background: #0a0a0a;
+  overflow: auto;
+  max-height: calc(100dvh - 28px);
+}
+.collectible-dialog > h2 {
+  display: none;
+}
+.collectible-dialog > .close {
+  z-index: 5;
+  top: 13px;
+  right: 13px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff25;
+  color: #fff;
+  border: 1px solid #ffffff35;
+}
+.collectible-hero {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    var(--gift-center),
+    var(--gift-edge)
+  );
+  padding: 12px 20px 19px;
+  text-align: center;
+  color: #fff;
+}
+.collectible-hero .gift-scene {
+  position: static;
+  height: 185px;
+  background: none;
+}
+.collectible-hero .gift-pattern {
+  z-index: 0;
+}
+.collectible-hero .gift-artwork {
+  z-index: 1;
+  width: 175px;
+  height: 175px;
+}
+.collectible-hero h2 {
+  position: relative;
+  z-index: 1;
+  font-size: 21px;
+  font-weight: 650;
+  padding: 0;
+  margin: 4px 0 6px;
+  color: #fff;
+}
+.collectible-hero p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 13px;
+  color: #ffffffc7;
+}
+.gift-facts.collectible-facts {
+  display: block;
+  margin: 16px;
+  border: 1px solid #282828;
+  border-radius: 14px;
+  overflow: hidden;
+  padding: 0;
+  background: #0b0b0b;
+}
+.collectible-facts > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  padding: 0;
+  gap: 0;
+  border: 0;
+  margin: 0;
+  font-size: 13px;
+}
+.collectible-facts > div + div {
+  border-top: 1px solid #262626;
+}
+.collectible-facts dt {
+  display: flex;
+  align-items: center;
+  padding: 11px 12px;
+  background: #151515;
+  color: #c5c5c5;
+  border-right: 1px solid #292929;
+  font-size: 13px;
+}
+.collectible-facts dd {
+  display: flex;
+  align-items: center;
+  padding: 11px 12px;
+  margin: 0;
+  color: #eee;
+  font-size: 13px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.collectible-pin {
+  display: block;
+  margin: 16px auto 0;
+  width: calc(100% - 32px);
+  min-height: 42px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+.collectible-dialog > .error {
+  margin: 12px 16px;
+}
+@media (max-width: 760px) {
+  .market-header {
+    height: 68px;
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .market-header > div {
+    gap: 11px;
+  }
+  .market-header h1 {
+    font-size: 21px;
+  }
+  .market-back {
+    width: 36px;
+    height: 36px;
+  }
+  .market-balance {
+    height: 36px;
+    font-size: 13px;
+    padding: 7px 11px;
+    gap: 6px;
+  }
+  .market-content {
+    width: 100%;
+    max-width: 514px;
+    padding: 0 14px;
+    margin: 22px auto 28px;
+  }
+  .market-tabs {
+    margin-bottom: 21px;
+  }
+  .market-tabs button {
+    font-size: 14px;
+    padding: 10px 6px;
+  }
+  .market-section-head {
+    margin-left: 3px;
+    margin-right: 3px;
+  }
+  .market-section-head h2 {
+    font-size: 13px;
+  }
+  .market-search {
+    width: 110px;
+  }
+  .market-search input {
+    font-size: 12px;
+  }
+  .market-grid,
+  .market-owned-grid {
+    gap: 9px;
+  }
+  .market-item {
+    border-radius: 25px;
+    padding: 7px 5px;
+    aspect-ratio: 0.82;
+  }
+  .market-item .gift-artwork {
+    max-width: 120px;
+  }
+  .market-price {
+    font-size: 12px;
+    padding: 6px 9px;
+    gap: 5px;
+  }
+  .market-price > span {
+    width: 13px;
+    height: 13px;
+    font-size: 8px;
+  }
+  .market-caption {
+    font-size: 11px;
+    margin-top: 20px;
+  }
+  .gift-tile.is-collectible,
+  .profile-collection .gift-tile.is-collectible {
+    border-radius: 22px;
+  }
+  .profile-collection .gift-scene .gift-artwork {
+    width: 88%;
+    height: 88%;
+    max-width: none;
+    max-height: none;
+  }
+  .edition-ribbon {
+    font-size: 9px;
+    top: 12px;
+    right: -32px;
+  }
+  .gift-pinned {
+    width: 21px;
+    height: 21px;
+    right: 6px;
+    bottom: 6px;
+  }
+  .collectible-dialog {
+    max-height: calc(100dvh - 20px);
+  }
+  .collectible-hero .gift-scene {
+    height: 175px;
+  }
+  .collectible-hero .gift-artwork {
+    width: 165px;
+    height: 165px;
+  }
+  .collectible-hero h2 {
+    font-size: 20px;
+  }
+  .collectible-facts > div {
+    grid-template-columns: 102px minmax(0, 1fr);
+  }
+  .collectible-facts dt,
+  .collectible-facts dd {
+    font-size: 12px;
+    padding: 10px;
+  }
+}
+/* Shared edition faces, with readable metadata in the market and a compact profile grid. */
+.gift-card-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.gift-traits {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.gift-tile.is-collectible,
+.profile-collection .gift-tile.is-collectible {
+  border-radius: 16px;
+}
+.market-owned-grid .gift-tile.is-collectible {
+  aspect-ratio: auto;
+  min-height: 0;
+  background: var(--surface) !important;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  padding: 0 0 16px;
+  text-align: left;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 250px;
+}
+.market-owned-grid .gift-card-face {
+  position: relative;
+  inset: auto;
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 0;
+}
+.market-owned-grid .gift-tile.is-collectible .gift-tile-name {
+  position: static;
+  display: block;
+  clip-path: none;
+  width: auto;
+  height: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  margin: 12px 14px 0;
+  padding: 0;
+  text-align: left;
+}
+.market-owned-grid .gift-traits {
+  position: static;
+  display: block;
+  clip-path: none;
+  width: auto;
+  height: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 5px 14px 0;
+}
+.collectible-dialog {
+  background: var(--surface);
+  border-radius: 18px;
+  border-color: var(--line-strong);
+}
+.collectible-dialog > .collectible-pin {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 16px auto 0;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.collectible-dialog > .close {
+  width: 38px;
+  height: 38px;
+  top: 12px;
+  right: 12px;
+}
+.collectible-hero h2 {
+  font-weight: 500;
+}
+.collectible-facts dt,
+.collectible-facts dd {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.gift-facts.collectible-facts {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  border-radius: 12px;
+}
+.collectible-facts dt {
+  background: var(--raised);
+  color: var(--secondary);
+  border-color: var(--line-strong);
+}
+.collectible-facts dd {
+  color: var(--text);
+}
+.collectible-facts > div + div {
+  border-color: var(--line-strong);
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .market-grid,
+  .market-owned-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+@media (max-width: 760px) {
+  .market-header {
+    padding: 0;
+    margin-bottom: 24px;
+    gap: 12px;
+    height: auto;
+  }
+  .market-header h1 {
+    font-size: 24px;
+    letter-spacing: -0.4px;
+  }
+  .market-header > div {
+    gap: 8px;
+  }
+  .market-back {
+    display: none;
+  }
+  .market-balance {
+    min-height: 38px;
+    height: auto;
+    border-radius: 10px;
+    font-size: 13px;
+    padding: 8px 11px;
+  }
+  .market-content {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+  }
+  .market-tabs {
+    margin: 0 0 20px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--line-strong);
+    border-radius: 0;
+    gap: 24px;
+    background: none;
+  }
+  .market-tabs button {
+    padding: 0 0 12px;
+    flex: none;
+    font-size: 13px;
+    min-height: 40px;
+    border-radius: 0;
+  }
+  .market-tabs button[aria-selected="true"] {
+    border-width: 0 0 2px;
+    border-color: var(--text);
+    background: none;
+  }
+  .market-section-head {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .market-section-head h2 {
+    font-size: 13px;
+  }
+  .market-search {
+    width: 175px;
+    max-width: 55%;
+    padding: 10px;
+    border-radius: 10px;
+  }
+  .market-search input {
+    font-size: 14px;
+  }
+  .market-grid,
+  .market-owned-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .market-item {
+    padding: 0 0 13px;
+    border-radius: 14px;
+    aspect-ratio: auto;
+  }
+  .market-item .gift-artwork {
+    max-width: 145px;
+    width: 86%;
+    height: 86%;
+    margin: 0;
+  }
+  .market-item-meta {
+    padding: 12px 11px 0;
+    gap: 6px;
+  }
+  .market-item-meta strong {
+    font-size: 11px;
+  }
+  .market-price {
+    font-size: 12px;
+    padding: 0;
+    background: none;
+    gap: 4px;
+  }
+  .market-price > span {
+    font-size: 9px;
+    background: none;
+    width: auto;
+    height: auto;
+  }
+  .gift-tile.is-collectible,
+  .profile-collection .gift-tile.is-collectible {
+    border-radius: 14px;
+  }
+  .market-owned-grid .gift-tile.is-collectible {
+    border-radius: 14px;
+    padding-bottom: 14px;
+  }
+  .market-owned-grid .gift-tile.is-collectible .gift-tile-name {
+    font-size: 12px;
+    margin: 10px 11px 0;
+  }
+  .market-owned-grid .gift-traits {
+    font-size: 10px;
+    margin: 4px 11px 0;
+  }
+  .market-purchase-dialog {
+    padding: 24px;
+    max-height: calc(100dvh - 24px);
+    border-radius: 17px;
+  }
+  .collectible-dialog > .close {
+    width: 40px;
+    height: 40px;
+  }
+  .collectible-facts dt,
+  .collectible-facts dd {
+    font-size: 12px;
+  }
+}
+.gift-tile .edition-ribbon {
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 500;
+  width: 100px;
+  top: 13px;
+  right: -29px;
+  letter-spacing: 0;
+  padding: 4px 0;
+  transform: rotate(45deg);
+}
+@media (max-width: 760px) {
+  .gift-tile .edition-ribbon {
+    font-size: 9px;
+    width: 90px;
+    right: -28px;
+    top: 12px;
+  }
+}

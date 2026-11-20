@@ -10,6 +10,7 @@ export const giftTemplateIds = [
 ];
 export const gifts = {
     star: {
+        price: 50,
         name: "Hanging Star",
         icon: "⭐",
         rarity: "Обычный",
@@ -17,6 +18,7 @@ export const gifts = {
         description: "Звезда-подвеска с улыбкой.",
     },
     heart: {
+        price: 100,
         name: "Heart Locket",
         icon: "💖",
         rarity: "Обычный",
@@ -24,6 +26,7 @@ export const gifts = {
         description: "Медальон-сердце с драгоценными камнями.",
     },
     flower: {
+        price: 150,
         name: "Pretty Posy",
         icon: "💐",
         rarity: "Редкий",
@@ -31,6 +34,7 @@ export const gifts = {
         description: "Яркий букет с золотой лентой.",
     },
     comet: {
+        price: 250,
         name: "Stellar Rocket",
         icon: "🚀",
         rarity: "Редкий",
@@ -38,6 +42,7 @@ export const gifts = {
         description: "Ракета для больших планов.",
     },
     moon: {
+        price: 350,
         name: "Moon Pendant",
         icon: "🌙",
         rarity: "Особенный",
@@ -45,6 +50,7 @@ export const gifts = {
         description: "Золотая подвеска с луной и звездой.",
     },
     diamond: {
+        price: 500,
         name: "Astral Shard",
         icon: "💎",
         rarity: "Особенный",
@@ -52,6 +58,7 @@ export const gifts = {
         description: "Переливающийся астральный кристалл.",
     },
     pepe: {
+        price: 1000,
         name: "Plush Pepe",
         icon: "🐸",
         rarity: "Особенный",
@@ -59,6 +66,7 @@ export const gifts = {
         description: "Плюшевый Пепе с сердцем.",
     },
     bear: {
+        price: 75,
         name: "Toy Bear",
         icon: "🧸",
         rarity: "Обычный",
@@ -103,4 +111,64 @@ export const badges = {
         description: "Создал канал в nimb.",
         condition: "Создать первый канал.",
     },
+};
+export const giftBackdrops = {
+    sapphire: {
+        name: "Sapphire",
+        center: "#528bdb",
+        edge: "#1c3f77",
+        patternColor: "#102d58",
+    },
+    amethyst: {
+        name: "Amethyst",
+        center: "#ad73de",
+        edge: "#4a276f",
+        patternColor: "#351957",
+    },
+    emerald: {
+        name: "Emerald",
+        center: "#75cfa3",
+        edge: "#25684e",
+        patternColor: "#124735",
+    },
+    rose: {
+        name: "Rose",
+        center: "#e58fae",
+        edge: "#864059",
+        patternColor: "#5d233b",
+    },
+    amber: {
+        name: "Amber",
+        center: "#e4bc6a",
+        edge: "#896033",
+        patternColor: "#5d3c17",
+    },
+    ocean: {
+        name: "Ocean",
+        center: "#72c3d3",
+        edge: "#265e79",
+        patternColor: "#123e51",
+    },
+    graphite: {
+        name: "Graphite",
+        center: "#878b9a",
+        edge: "#363947",
+        patternColor: "#21232f",
+    },
+    sunset: {
+        name: "Sunset",
+        center: "#e6a083",
+        edge: "#995348",
+        patternColor: "#71382f",
+    },
+};
+export const giftSymbols = {
+    stars: "Stars",
+    crowns: "Crowns",
+    hearts: "Hearts",
+    moons: "Moons",
+    diamonds: "Diamonds",
+    flowers: "Flowers",
+    lightning: "Lightning",
+    clovers: "Clovers",
 };

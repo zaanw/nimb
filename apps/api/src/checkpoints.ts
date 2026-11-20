@@ -1,3 +1,4 @@
+import {editionForGift} from "./collectibles.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
@@ -435,16 +436,19 @@ export function registerCheckpoints(
             },
           });
           for (const g of target.gifts) {
+            const edition = await editionForGift(tx, g.id, g.template);
             await tx.gift.upsert({
               where: { id: g.id },
               create: {
                 id: g.id,
+                editionId: edition.id,
                 ownerId: id,
                 template: g.template,
                 pinned: g.pinned,
                 receivedAt: new Date(g.receivedAt),
               },
               update: {
+                editionId: edition.id,
                 template: g.template,
                 pinned: g.pinned,
                 receivedAt: new Date(g.receivedAt),

@@ -1,3 +1,4 @@
+import { openNavigation } from "./navigation";
 import { test, expect, type Page } from "@playwright/test";
 
 async function fixture(page: Page, owner = true, plus = true) {
@@ -166,6 +167,7 @@ test("ordinary accounts see the shared design but cannot edit Plus appearance", 
   page,
 }) => {
   await fixture(page, false, false);
+  await openNavigation(page);
   await page
     .locator(".side-utilities")
     .getByRole("button", { name: "Настройки", exact: true })

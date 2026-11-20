@@ -82,7 +82,10 @@ export function SettingsMenu({
       <div className="search-box settings-search">
         <Search size={17} />
         <input
-          placeholder="Поиск"
+          placeholder="Поиск настроек…"
+          name="settings-search"
+          type="search"
+          autoComplete="off"
           aria-label="Поиск настроек"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
@@ -148,12 +151,15 @@ export function SettingsOverview({
     <div className="settings-overview">
       <div className="settings-overview-person">
         {avatar}
-        <h2>{name}</h2>
-        <p>@{username}</p>
+        <div className="settings-account-name">
+          <h2>{name}</h2>
+          <p>@{username}</p>
+        </div>
         <button className="outline" onClick={() => onSelect("Аккаунт")}>
           Открыть аккаунт <ChevronRight size={15} />
         </button>
       </div>
+      <h3 className="settings-quick-title">Быстрый доступ</h3>
       <div className="settings-overview-links">
         {[
           ["Безопасность", "Пароль и активные сеансы", LockKeyhole],

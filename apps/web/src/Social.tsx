@@ -17,6 +17,8 @@ import {
   Search,
   ArrowUpRight,
   Wallet,
+  Gift,
+  ChevronRight,
   Hash,
   SquarePen,
 } from "lucide-react";
@@ -415,55 +417,53 @@ export function Feed({
             {query.isFetchingNextPage && <p className="muted">Загрузка…</p>}
           </div>
         </div>
-        <aside className="feed-aside">
-          <section className="context-card">
-            <button onClick={() => onNavigate("profile")}>
-              <div className="context-identity">
-                <span className="social-avatar">
-                  {me.hasAvatar ? (
-                    <img
-                      src={`/api/users/${me.id}/media/avatar?v=${me.mediaVersion || 0}`}
-                      alt=""
-                    />
-                  ) : (
-                    me.name.slice(0, 1).toUpperCase()
-                  )}
-                </span>
-                <span>
-                  <strong>
-                    <UserName user={me} />
-                  </strong>
-                  <small>@{me.username}</small>
-                </span>
-              </div>
-              <div className="context-row">
-                Мой профиль <ArrowUpRight size={15} />
-              </div>
-            </button>
-          </section>
-          <section className="context-card">
-            <div className="context-wallet-icon">
-              <Wallet size={18} />
-            </div>
-            <h2>Юзернеймы и номера</h2>
-            <p>Купленные имена и номера хранятся в кошельке.</p>
-            <button
-              className="text-action"
-              onClick={() => onNavigate("wallet")}
-            >
-              Открыть кошелёк <ArrowUpRight size={14} />
-            </button>
-          </section>
-          <section className="context-card">
-            <h2>Поиск пользователей</h2>
-            <p>Ищите людей по @юзернейму и подписывайтесь на их публикации.</p>
-            <button className="text-action" onClick={() => onNavigate("chats")}>
-              Перейти к общению <ArrowUpRight size={14} />
-            </button>
-          </section>
-          <div className="context-footer">
-            <Brand markOnly /> nimb
-          </div>
+        <aside className="feed-aside" aria-label="Быстрый доступ">
+          <button
+            className="feed-account-link"
+            onClick={() => onNavigate("profile")}
+          >
+            <span className="social-avatar">
+              {me.hasAvatar ? (
+                <img
+                  src={`/api/users/${me.id}/media/avatar?v=${me.mediaVersion || 0}`}
+                  width="40"
+                  height="40"
+                  alt=""
+                />
+              ) : (
+                me.name.slice(0, 1).toUpperCase()
+              )}
+            </span>
+            <span>
+              <strong>
+                <UserName user={me} />
+              </strong>
+              <small>@{me.username}</small>
+            </span>
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </button>
+          <h2>Ваше пространство</h2>
+          <button
+            className="feed-shortcut"
+            onClick={() => onNavigate("market")}
+          >
+            <Gift size={18} aria-hidden="true" />
+            <span>Подарки</span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+          <button
+            className="feed-shortcut"
+            onClick={() => onNavigate("wallet")}
+          >
+            <Wallet size={18} aria-hidden="true" />
+            <span>Имена и номера</span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+          <button className="feed-shortcut" onClick={() => onNavigate("chats")}>
+            <MessageCircle size={18} aria-hidden="true" />
+            <span>Переписки</span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
         </aside>
       </div>
       {dialog}

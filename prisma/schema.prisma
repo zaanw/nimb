@@ -42,6 +42,7 @@ model User {
   hasMusic Boolean @default(false)
   badges BadgeAward[]
   gifts Gift[] @relation("GiftOwner")
+  giftPurchases GiftPurchase[]
   giftEvents GiftEvent[] @relation("GiftSender")
   messageViews MessageView[]
   messageDeliveries MessageDelivery[]
@@ -236,6 +237,9 @@ model BadgeAward {
 }
 model Gift {
   id Int @id @default(autoincrement())
+  editionId Int? @unique
+  edition GiftEdition? @relation(fields:[editionId], references:[id], onDelete:Restrict)
+  purchases GiftPurchase[]
   template String
   ownerId Int
   pinned Boolean @default(false)
@@ -455,4 +459,33 @@ model TrustedProxy {
  createdById Int
  createdAt DateTime @default(now())
  creator User @relation(fields:[createdById], references:[id], onDelete:Restrict)
+}
+
+// Editions survive stat rollbacks so collectible numbers and appearance never reroll.
+model GiftEdition {
+  id Int @id @default(autoincrement())
+  originalGiftId Int @unique
+  template String
+  serialNumber Int
+  backdrop String
+  symbol String
+  mintedAt DateTime @default(now())
+  gift Gift?
+  @@unique([template, serialNumber])
+}
+model GiftCounter {
+  template String @id
+  lastNumber Int
+}
+model GiftPurchase {
+  requestId String @id
+  originalGiftId Int
+  userId Int
+  template String
+  giftId Int?
+  price Int
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  gift Gift? @relation(fields:[giftId], references:[id], onDelete:SetNull)
+  @@index([userId, createdAt])
 }

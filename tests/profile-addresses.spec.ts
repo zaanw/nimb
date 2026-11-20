@@ -1,3 +1,4 @@
+import { navigate } from "./navigation";
 import { test, expect } from "@playwright/test";
 test("profile displays multiple usernames and formatted numbers, with copying", async ({
   page,
@@ -129,10 +130,7 @@ test("wallet visibility controls publish only the selected collectible", async (
     });
   });
   await page.goto("/");
-  await page
-    .locator(".mobile-nav")
-    .getByRole("button", { name: "Кошелёк", exact: true })
-    .click();
+  await navigate(page, "Кошелёк");
   const toggle = page.getByRole("checkbox", {
     name: "Показывать в профиле",
     exact: true,
@@ -146,10 +144,7 @@ test("wallet visibility controls publish only the selected collectible", async (
     .getByRole("button", { name: "Профиль", exact: true })
     .click();
   await expect(page.locator(".profile-also")).toContainText("@ladesev");
-  await page
-    .locator(".mobile-nav")
-    .getByRole("button", { name: "Кошелёк", exact: true })
-    .click();
+  await navigate(page, "Кошелёк");
   await toggle.uncheck();
   await expect(toggle).not.toBeChecked();
   await page
@@ -157,10 +152,7 @@ test("wallet visibility controls publish only the selected collectible", async (
     .getByRole("button", { name: "Профиль", exact: true })
     .click();
   await expect(page.locator(".profile-also")).toHaveCount(0);
-  await page
-    .locator(".mobile-nav")
-    .getByRole("button", { name: "Кошелёк", exact: true })
-    .click();
+  await navigate(page, "Кошелёк");
   rejectNextVisibilityChange = true;
   await toggle.click();
   await expect(page.getByRole("alert")).toContainText("Изменение не сохранено");

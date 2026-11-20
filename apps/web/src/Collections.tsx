@@ -1,9 +1,10 @@
+import { Dialog } from "./UI";
+import { GiftCard, GiftDetails, type CollectibleGift } from "./CollectibleGift";
 import { GiftArtwork } from "./GiftArtwork";
 import { BadgeIcon } from "./Identity";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { Gift as GiftIcon, X } from "lucide-react";
+import { Gift as GiftIcon } from "lucide-react";
 type Template = {
   id: string;
   name: string;
@@ -12,14 +13,7 @@ type Template = {
   color: string;
   description: string;
 };
-type Gift = Omit<Template, "id"> & {
-  id: number;
-  template: string;
-  pinned: boolean;
-  receivedAt: string;
-  ownerId: number;
-  sender: { name: string; username: string } | null;
-};
+type Gift = CollectibleGift;
 type Badge = {
   id: string;
   name: string;
@@ -63,10 +57,12 @@ export function Collections({
   const badgeQuery = useQuery({
     queryKey: ["badges", userId],
     queryFn: () => api<{ badges: Badge[] }>(`/users/${userId}/badges`),
+    enabled: section !== "gifts",
   });
   const giftQuery = useQuery({
     queryKey: ["gifts", userId],
     queryFn: () => api<{ gifts: Gift[] }>(`/users/${userId}/gifts`),
+    enabled: section !== "badges",
   });
   const catalog = useQuery({
     queryKey: ["gift-catalog"],
@@ -147,17 +143,7 @@ export function Collections({
           ) : giftQuery.data?.gifts.length ? (
             <div className="gift-grid">
               {giftQuery.data.gifts.map((g) => (
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  className={"gift-tile " + g.color}
-                  key={g.id}
-                  onClick={() => setDetail(g)}
-                >
-                  <small>#{g.id}</small>
-                  <GiftArtwork template={g.template} />
-                  <strong>{g.name}</strong>
-                  {g.pinned && <em>Закреплён</em>}
-                </motion.button>
+                <GiftCard key={g.id} gift={g} onClick={() => setDetail(g)} />
               ))}
             </div>
           ) : (
@@ -166,138 +152,62 @@ export function Collections({
         </section>
       )}
       {(showCatalog || openCatalog) && (
-        <div
-          className="overlay"
-          onClick={() => {
+        <Dialog
+          title="Выберите подарок"
+          className="edit-modal gift-picker"
+          onClose={() => {
             setShowCatalog(false);
             onCatalogClose?.();
           }}
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="modal edit-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="icon-button close"
-              aria-label="Закрыть"
-              onClick={() => {
-                setShowCatalog(false);
-                onCatalogClose?.();
-              }}
-            >
-              <X size={20} />
-            </button>
-            <div className="small-label">ЗНАК ВНИМАНИЯ</div>
-            <h2>Выберите подарок</h2>
-            <p className="muted">
-              Бесплатные коллекционные предметы внутри nimb. Оплата и обмен не
-              предусмотрены.
-            </p>
-            <div className="gift-grid">
-              {catalog.data?.templates.map((t) => (
-                <button
-                  className={"gift-tile " + t.color}
-                  key={t.id}
-                  disabled={send.isPending}
-                  onClick={() => send.mutate(t.id)}
-                >
-                  <GiftArtwork template={t.id} />
-                  <strong>{t.name}</strong>
-                  <em>{t.rarity}</em>
-                </button>
-              ))}
-            </div>
-            {catalog.isError && (
-              <p className="error">{catalog.error.message}</p>
-            )}
-            {send.isError && <p className="error">{send.error.message}</p>}
-          </motion.div>
-        </div>
+          <p className="muted">
+            Подарок отправится этому пользователю. Его номер, фон и узор
+            сохранятся в коллекции.
+          </p>
+          <div className="gift-grid">
+            {catalog.data?.templates.map((t) => (
+              <button
+                className={"gift-tile " + t.color}
+                key={t.id}
+                disabled={send.isPending}
+                onClick={() => send.mutate(t.id)}
+              >
+                <GiftArtwork template={t.id} />
+                <strong>{t.name}</strong>
+                <em>{t.rarity}</em>
+              </button>
+            ))}
+          </div>
+          {catalog.isError && <p className="error">{catalog.error.message}</p>}
+          {send.isError && <p className="error">{send.error.message}</p>}
+        </Dialog>
       )}
-      {detail && (
-        <div className="overlay" onClick={() => setDetail(null)}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="modal edit-modal gift-detail"
-            role="dialog"
-            aria-modal="true"
-            aria-label={detail.name}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="icon-button close"
-              aria-label="Закрыть"
-              onClick={() => setDetail(null)}
-            >
-              <X size={20} />
-            </button>
-            <div
-              className={
-                "gift-detail-icon " +
-                ("template" in detail
-                  ? "gift-stage " + detail.color
-                  : "badge-" + detail.id)
-              }
-            >
-              {"template" in detail ? (
-                <GiftArtwork template={detail.template} animate />
-              ) : (
-                <BadgeIcon id={detail.id} size={50} />
-              )}
-            </div>
-            <h2>{detail.name}</h2>
-            <p>{detail.description}</p>
-            {"template" in detail ? (
-              <>
-                <dl className="gift-facts">
-                  <div>
-                    <dt>Экземпляр</dt>
-                    <dd>#{detail.id}</dd>
-                  </div>
-                  <div>
-                    <dt>Коллекция</dt>
-                    <dd>{detail.rarity}</dd>
-                  </div>
-                  <div>
-                    <dt>Владелец</dt>
-                    <dd>ID {userId}</dd>
-                  </div>
-                  {detail.sender && (
-                    <div>
-                      <dt>Отправитель</dt>
-                      <dd>@{detail.sender.username}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt>Получен</dt>
-                    <dd>
-                      {new Date(detail.receivedAt).toLocaleDateString("ru-RU")}
-                    </dd>
-                  </div>
-                </dl>
-                {own && (
-                  <button
-                    className="primary"
-                    disabled={pin.isPending}
-                    onClick={() => pin.mutate(detail)}
-                  >
-                    {detail.pinned ? "Открепить" : "Закрепить в профиле"}
-                  </button>
-                )}
-                {pin.isError && <p className="error">{pin.error.message}</p>}
-              </>
-            ) : (
-              <p className="muted">
-                {detail.condition}
-                <br />
-                Выдан {new Date(detail.awardedAt).toLocaleDateString("ru-RU")}
-              </p>
-            )}
-          </motion.div>
-        </div>
+      {detail && "template" in detail && (
+        <GiftDetails
+          gift={detail}
+          own={own}
+          onClose={() => setDetail(null)}
+          onPin={() => pin.mutate(detail)}
+          pending={pin.isPending}
+          error={pin.isError ? pin.error.message : undefined}
+        />
+      )}
+      {detail && !("template" in detail) && (
+        <Dialog
+          title={detail.name}
+          className="badge-detail"
+          onClose={() => setDetail(null)}
+        >
+          <div className={"gift-detail-icon badge-" + detail.id}>
+            <BadgeIcon id={detail.id} size={50} />
+          </div>
+          <p>{detail.description}</p>
+          <p className="muted">
+            {detail.condition}
+            <br />
+            Выдан {new Date(detail.awardedAt).toLocaleDateString("ru-RU")}
+          </p>
+        </Dialog>
       )}
     </>
   );

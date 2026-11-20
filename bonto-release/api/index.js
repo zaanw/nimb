@@ -1,3 +1,5 @@
+import { registerMarket } from "./market.js";
+import { createCollectible, collectibleView } from "./collectibles.js";
 import { registerReclaims } from './reclaims.js';
 import { createNetworkGuard } from './network-bans.js';
 import { checkpoint, registerCheckpoints } from './checkpoints.js';
@@ -42,7 +44,8 @@ if (production) {
 await app.register(cookie);
 await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 1 } });
 await app.register(cors, { origin, credentials: true });
-await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+// Files served by fastify-static must not consume the API request budget.
+await app.register(rateLimit, { max: 300, timeWindow: '1 minute', allowList: req => typeof req.routeOptions.config.file === 'string' });
 app.addHook('onRequest', networkGuard.onRequest);
 app.addHook('onSend', networkGuard.onSend);
 app.addHook('onRequest', async (req, reply) => {
@@ -289,7 +292,7 @@ app.post('/api/admin/users/:id/currency', { config: { rateLimit: { max: 30, time
     return reply.code(400).send({ error: 'Пользователь не найден или превышен максимальный баланс' }); io.to(`user:${id}`).emit('wallet:update'); return { balance: result.nimbBalance }; });
 app.post('/api/admin/users/:id/gifts', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => { const actor = await adminAuth(req, reply); if (!actor)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); const { template } = z.object({ template: z.enum(giftTemplateIds) }).parse(req.body); if (!await db.user.findUnique({ where: { id }, select: { id: true } }))
-    return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${id})`; await checkpoint(tx, id, actor.userId, 'Перед выдачей подарка'); return tx.gift.create({ data: { ownerId: id, template, events: { create: { senderId: actor.userId } } } }); }); io.to(`user:${id}`).emit('gift:new', { userId: id }); return { gift: { id: gift.id } }; });
+    return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${id})`; await checkpoint(tx, id, actor.userId, 'Перед выдачей подарка'); return createCollectible(tx, id, template, actor.userId); }); io.to(`user:${id}`).emit('gift:new', { userId: id }); return { gift: { id: gift.id } }; });
 app.get('/api/admin/reports', async (req, reply) => {
     if (!await adminAuth(req, reply))
         return;
@@ -606,6 +609,7 @@ networkGuard.register(app, auth, async (kind, value) => {
 registerIdentity(app, db, auth, announceProfile);
 registerReclaims(app, db, auth, async (id) => { io.to(`user:${id}`).emit('wallet:update'); await announceProfile(id); });
 registerCheckpoints(app, db, auth, async (id) => { io.to(`user:${id}`).emit('wallet:update'); io.to(`user:${id}`).emit('gift:new', { userId: id }); await announceProfile(id); });
+registerMarket(app, db, auth, async (id) => { io.to(`user:${id}`).emit("wallet:update"); io.to(`user:${id}`).emit("gift:new", { userId: id }); await announceProfile(id); });
 registerMessenger(app, db, auth, id => io.to(`user:${id}`).emit('personal:update'));
 app.get('/api/wallet', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const [user, owned] = await Promise.all([db.user.findUniqueOrThrow({ where: { id: s.userId }, select: { nimbBalance: true, username: true, collectibleNumber: true } }), db.usernamePurchase.findMany({ where: { ownerId: s.userId }, orderBy: { id: 'desc' }, select: { username: true, price: true, purchasedAt: true, public: true } })]); return { balance: user.nimbBalance, username: user.username, collectibleNumber: user.collectibleNumber, owned }; });
@@ -687,11 +691,11 @@ app.get('/api/users/:id/badges', async (req, reply) => { const s = await auth(re
     return reply.code(404).send({ error: 'Пользователь не найден' }); const awards = await db.badgeAward.findMany({ where: { userId }, orderBy: { awardedAt: 'asc' } }); return { badges: awards.filter(a => badges[a.badge]).map(a => ({ ...badges[a.badge], id: a.badge, awardedAt: a.awardedAt })) }; });
 app.get('/api/users/:id/gifts', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const userId = intId(req.params.id); if (!await db.user.findUnique({ where: { id: userId } }) || await blocked(s.userId, userId))
-    return reply.code(404).send({ error: 'Пользователь не найден' }); const owned = await db.gift.findMany({ where: { ownerId: userId }, orderBy: [{ pinned: 'desc' }, { id: 'desc' }], take: 100, include: { events: { take: 1, orderBy: { id: 'asc' }, include: { sender: { select: publicUser } } } } }); return { gifts: owned.filter(g => g.template in gifts).map(g => ({ id: g.id, template: g.template, ...gifts[g.template], pinned: g.pinned, receivedAt: g.receivedAt, ownerId: g.ownerId, sender: g.events[0]?.sender || null })) }; });
+    return reply.code(404).send({ error: 'Пользователь не найден' }); const owned = await db.gift.findMany({ where: { ownerId: userId }, orderBy: [{ pinned: 'desc' }, { id: 'desc' }], take: 100, include: { edition: true, events: { take: 1, orderBy: { id: 'asc' }, include: { sender: { select: publicUser } } } } }); return { gifts: owned.filter(g => g.template in gifts).map(g => ({ ...collectibleView({ id: g.id, template: g.template, edition: g.edition, pinned: g.pinned, receivedAt: g.receivedAt, ownerId: g.ownerId }), sender: g.events[0]?.sender || null })) }; });
 app.post('/api/users/:id/gifts', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const userId = intId(req.params.id); const { template } = z.object({ template: z.enum(giftTemplateIds) }).parse(req.body); if (userId === s.userId)
     return reply.code(400).send({ error: 'Подарок можно отправить другому пользователю' }); if (!await db.user.findUnique({ where: { id: userId } }) || await blocked(s.userId, userId))
-    return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.gift.create({ data: { ownerId: userId, template, events: { create: { senderId: s.userId } } } }); io.to(`user:${userId}`).emit('gift:new', { userId }); return { gift }; });
+    return reply.code(404).send({ error: 'Пользователь не найден' }); const gift = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${userId})`; return createCollectible(tx, userId, template, s.userId); }); io.to(`user:${userId}`).emit('gift:new', { userId }); return { gift }; });
 app.patch('/api/gifts/:id/pin', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = intId(req.params.id); const { pinned } = z.object({ pinned: z.boolean() }).parse(req.body); const result = await db.$transaction(async (tx) => { await tx.$executeRaw `SELECT pg_advisory_xact_lock(${s.userId})`; const gift = await tx.gift.findFirst({ where: { id, ownerId: s.userId } }); if (!gift)
     return 'missing'; if (pinned && !gift.pinned && (await tx.gift.count({ where: { ownerId: s.userId, pinned: true } })) >= 3)

@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { io, type Socket } from "socket.io-client";
 import {
   Menu,
+  Store,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -61,7 +62,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import "./style.css";
-import { Brand, PageHeading } from "./UI";
+import { Brand, PageHeading, Dialog } from "./UI";
 import { Feed, ProfileActions, ProfilePosts } from "./Social";
 import {
   CommunityDialog,
@@ -101,9 +102,13 @@ import { ProfileIdentifiers } from "./ProfileIdentifiers";
 import { UserName, IdentitySettings, type Identity } from "./Identity";
 import "./theme.css";
 import "./quiet.css";
-import "./reference.css";
+import "./design-system.css";
+import "./market.css";
 import { SettingsMenu, SettingsOverview } from "./SettingsMenu";
 initializePreferences();
+const Market = React.lazy(() =>
+  import("./Market").then((module) => ({ default: module.Market })),
+);
 
 type User = Identity & {
   id: number;
@@ -204,7 +209,27 @@ function App() {
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   });
   const [tab, setTab] = useState("chats");
-  const [navigationExpanded, setNavigationExpanded] = useState(false);
+  const [navigationExpanded, setNavigationExpanded] = useState(
+    () => window.innerWidth > 1100,
+  );
+  useEffect(() => {
+    if (!navigationExpanded) return;
+    const close = (event: KeyboardEvent) => {
+      if (
+        event.key === "Escape" &&
+        !document.querySelector('[role="dialog"]') &&
+        (document.querySelector(".sidebar")?.contains(document.activeElement) ||
+          document.activeElement?.classList.contains("navigation-toggle"))
+      ) {
+        setNavigationExpanded(false);
+        document
+          .querySelector<HTMLButtonElement>(".navigation-toggle")
+          ?.focus();
+      }
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [navigationExpanded]);
   const [selected, setSelected] = useState<Chat | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
@@ -258,16 +283,19 @@ function App() {
         !location.search.includes("invite=") &&
         !pushChatId
       ) {
+        const requestedTab =
+          new URLSearchParams(location.search).get("tab") || saved.tab;
         const next = [
           "chats",
           "feed",
           "profile",
           "settings",
           "wallet",
+          "market",
           "saved",
           ...(me.data?.isAdmin ? ["admin"] : []),
-        ].includes(saved.tab)
-          ? saved.tab
+        ].includes(requestedTab)
+          ? requestedTab
           : "chats";
         if (next === "chats" && saved.chatId && !chats.data && !chats.isError)
           return;
@@ -428,7 +456,11 @@ function App() {
     });
     socket.on("gift:new", async () => {
       await qc.cancelQueries({ queryKey: ["gifts"] });
-      await qc.invalidateQueries({ queryKey: ["gifts"] });
+      await Promise.all(
+        ["gifts", "market-collection", "market-catalog"].map((key) =>
+          qc.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
     });
     socket.on("profile:update", (payload: { id: number }) => {
       if (payload.id === me.data?.user.id) {
@@ -663,7 +695,13 @@ function App() {
           }
         : undefined;
   function nav(t: string) {
-    setNavigationExpanded(false);
+    const url = new URL(location.href);
+    url.searchParams.set("tab", t);
+    for (const key of ["user", "invite", "chat"]) url.searchParams.delete(key);
+    if (t !== "market")
+      for (const key of ["market-view", "market-search"])
+        url.searchParams.delete(key);
+    history.replaceState(null, "", url);
     window.scrollTo(0, 0);
     if (mainRef.current) mainRef.current.scrollTop = 0;
     setWalletOpen(t === "wallet");
@@ -698,11 +736,15 @@ function App() {
     <div
       className={
         "shell " +
+        (tab === "market" ? "market-open " : "") +
         (navigationExpanded ? "navigation-expanded " : "") +
         (messenger ? "messenger-shell" : "") +
         (messenger && (selected || profile) ? " conversation-open" : "")
       }
     >
+      <a className="skip-link" href="#main-content">
+        К содержимому
+      </a>
       <header className="app-topbar">
         <button
           className="icon-button navigation-toggle"
@@ -710,20 +752,7 @@ function App() {
           aria-expanded={navigationExpanded}
           onClick={() => setNavigationExpanded((value) => !value)}
         >
-          <Menu size={21} />
-        </button>
-        <button
-          className="topbar-account"
-          aria-label="Открыть мой профиль"
-          onClick={() => nav("profile")}
-        >
-          <Avatar user={user} />
-          <span>
-            <strong>
-              <UserName user={user} />
-            </strong>
-            <small>@{user.username}</small>
-          </span>
+          <PanelLeft size={20} aria-hidden="true" />
         </button>
         <button
           className="topbar-brand"
@@ -737,30 +766,37 @@ function App() {
             className="outline topbar-create"
             onClick={() => setCommunityDialog(true)}
           >
-            <Plus size={17} />
+            <Plus size={16} aria-hidden="true" />
             Создать
           </button>
           <button
-            className="icon-button"
+            className="icon-button topbar-settings"
             aria-label="Открыть настройки"
+            title="Настройки"
             onClick={() => nav("settings")}
           >
-            <Settings size={19} />
+            <Settings size={19} aria-hidden="true" />
+          </button>
+          <button
+            className="topbar-account"
+            aria-label="Открыть мой профиль"
+            onClick={() => nav("profile")}
+          >
+            <Avatar user={user} />
+            <span>
+              <strong>
+                <UserName user={user} />
+              </strong>
+              <small>@{user.username}</small>
+            </span>
           </button>
         </div>
       </header>
       <aside className="sidebar" aria-label="Основная навигация">
-        <button
-          className="side-brand"
-          onClick={() => nav("chats")}
-          aria-label="Nimb — чаты"
-        >
-          <Brand />
-        </button>
-        <span className="side-label">ОБЩЕНИЕ</span>
+        <span className="side-label">Общение</span>
         <Nav tab={tab} nav={nav} />
         <div className="side-utilities">
-          <span className="side-label">ПРОСТРАНСТВО</span>
+          <span className="side-label">Пространство</span>
           <button
             className={tab === "settings" ? "active" : ""}
             aria-label="Настройки"
@@ -783,23 +819,10 @@ function App() {
             </button>
           )}
         </div>
-        <button
-          className="side-bottom"
-          aria-label="Мой аккаунт"
-          title="Мой профиль"
-          onClick={() => nav("profile")}
-        >
-          <Avatar user={user} />
-          <span>
-            <strong>
-              <UserName user={user} />
-            </strong>
-            <small>@{user.username}</small>
-          </span>
-          <ChevronRight size={16} />
-        </button>
       </aside>
       <main
+        id="main-content"
+        tabIndex={-1}
         ref={mainRef}
         className={
           "main " +
@@ -1174,7 +1197,20 @@ function App() {
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.18 }}
           >
-            {walletOpen ? (
+            {tab === "market" ? (
+              <React.Suspense
+                fallback={
+                  <p role="status" className="page-loading">
+                    Загрузка маркета…
+                  </p>
+                }
+              >
+                <Market
+                  onBack={() => nav("chats")}
+                  onWallet={() => nav("wallet")}
+                />
+              </React.Suspense>
+            ) : walletOpen ? (
               <Wallet onBack={() => nav("chats")} />
             ) : tab === "saved" ? (
               <SavedMessages
@@ -1239,23 +1275,18 @@ function App() {
                   </button>
                 </header>
                 {profile && (
-                  <div className="overlay" onClick={() => setProfile(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="icon-button close"
-                        aria-label="Закрыть"
-                        onClick={() => setProfile(null)}
-                      >
-                        <X size={20} />
-                      </button>
-                      <Profile
-                        user={profile}
-                        own={false}
-                        onMessage={() => setProfile(null)}
-                        onEdit={() => {}}
-                      />
-                    </div>
-                  </div>
+                  <Dialog
+                    title={profile.name}
+                    className="profile-dialog"
+                    onClose={() => setProfile(null)}
+                  >
+                    <Profile
+                      user={profile}
+                      own={false}
+                      onMessage={() => setProfile(null)}
+                      onEdit={() => {}}
+                    />
+                  </Dialog>
                 )}
                 {typingChat === selected.id && (
                   <div className="typing-indicator">Печатает…</div>
@@ -1615,8 +1646,11 @@ function App() {
           </motion.div>
         </AnimatePresence>
         {error && (
-          <div className="toast" onClick={() => setError("")}>
-            {error} <X size={15} />
+          <div className="toast" role="alert">
+            <span>{error}</span>
+            <button aria-label="Скрыть ошибку" onClick={() => setError("")}>
+              <X size={15} aria-hidden="true" />
+            </button>
           </div>
         )}
       </main>
@@ -1624,70 +1658,60 @@ function App() {
         <Nav tab={tab} nav={nav} mobile />
       </div>
       {forwardMessage && (
-        <div className="overlay" onClick={() => setForwardMessage(null)}>
-          <div
-            className="modal edit-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="icon-button close"
-              onClick={() => setForwardMessage(null)}
-              aria-label="Закрыть"
-            >
-              <X size={20} />
-            </button>
-            <div className="small-label">ПЕРЕСЛАТЬ СООБЩЕНИЕ</div>
-            <h2>Выберите чат</h2>
-            <p className="muted">{forwardMessage.text}</p>
-            <div className="people-list">
-              {chats.data?.chats.map((c) => {
-                const target =
-                  c.kind === "direct"
-                    ? c.members.find((m) => m.user.id !== user.id)?.user
-                    : {
-                        id: 0,
-                        name: c.title,
-                        username: c.kind === "channel" ? "Канал" : "Группа",
-                        bio: "",
-                        createdAt: "",
-                      };
-                if (!target) return null;
-                return (
-                  <button
-                    className="list-item"
-                    key={c.id}
-                    onClick={async () => {
-                      try {
-                        await api(
-                          `/messages/${forwardMessage.id}/forward`,
-                          send("POST", { chatId: c.id }),
-                        );
-                        setForwardMessage(null);
-                        setSelected(c);
-                        qc.invalidateQueries({ queryKey: ["chats"] });
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
-                  >
-                    <ChatAvatar chat={c} user={target} />
-                    <span className="item-copy">
-                      <strong>
-                        <UserName user={target} />
-                      </strong>
-                      <small>
-                        {c.kind === "direct"
-                          ? `@${target.username}`
-                          : target.username}
-                      </small>
-                    </span>
-                    <ChevronRight size={18} />
-                  </button>
-                );
-              })}
-            </div>
+        <Dialog
+          title="Выберите чат"
+          className="edit-modal"
+          onClose={() => setForwardMessage(null)}
+        >
+          <p className="muted">{forwardMessage.text}</p>
+          <div className="people-list">
+            {chats.data?.chats.map((c) => {
+              const target =
+                c.kind === "direct"
+                  ? c.members.find((m) => m.user.id !== user.id)?.user
+                  : {
+                      id: 0,
+                      name: c.title,
+                      username: c.kind === "channel" ? "Канал" : "Группа",
+                      bio: "",
+                      createdAt: "",
+                    };
+              if (!target) return null;
+              return (
+                <button
+                  className="list-item"
+                  key={c.id}
+                  onClick={async () => {
+                    try {
+                      await api(
+                        `/messages/${forwardMessage.id}/forward`,
+                        send("POST", { chatId: c.id }),
+                      );
+                      setForwardMessage(null);
+                      setSelected(c);
+                      qc.invalidateQueries({ queryKey: ["chats"] });
+                    } catch (e) {
+                      setError((e as Error).message);
+                    }
+                  }}
+                >
+                  <ChatAvatar chat={c} user={target} />
+                  <span className="item-copy">
+                    <strong>
+                      <UserName user={target} />
+                    </strong>
+                    <small>
+                      {c.kind === "direct"
+                        ? `@${target.username}`
+                        : target.username}
+                    </small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </Dialog>
       )}
       {chatTools && currentChat && other && (
         <ChatTools
@@ -1723,95 +1747,85 @@ function App() {
         />
       )}{" "}
       {editing && (
-        <div className="overlay" onClick={() => setEditing(false)}>
-          <div
-            className="modal edit-modal"
-            onClick={(e) => e.stopPropagation()}
+        <Dialog
+          title="Редактировать"
+          className="edit-modal"
+          onClose={() => setEditing(false)}
+        >
+          <ProfileMediaEditor
+            user={user}
+            onUpdate={(u) => {
+              qc.setQueryData(
+                ["me"],
+                (old: { user: User; isAdmin?: boolean } | undefined) => ({
+                  ...old,
+                  user: u,
+                }),
+              );
+              setProfile(u);
+              qc.invalidateQueries({ queryKey: ["chats"] });
+              qc.invalidateQueries({ queryKey: ["users"] });
+            }}
+          />
+          <MusicEditor
+            user={user}
+            onUpdate={(u) => {
+              qc.setQueryData(
+                ["me"],
+                (old: { user: User; isAdmin?: boolean } | undefined) => ({
+                  ...old,
+                  user: u,
+                }),
+              );
+              setProfile(u);
+            }}
+          />
+          <LinksEditor
+            user={user}
+            onUpdate={(u) => {
+              qc.setQueryData(
+                ["me"],
+                (old: { user: User; isAdmin?: boolean } | undefined) => ({
+                  ...old,
+                  user: u,
+                }),
+              );
+              setProfile(u);
+            }}
+          />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              save.mutate({
+                name: String(f.get("name")),
+                bio: String(f.get("bio")),
+              });
+            }}
           >
-            <button
-              className="icon-button close"
-              aria-label="Закрыть"
-              onClick={() => setEditing(false)}
-            >
-              <X size={20} />
+            <label>
+              Имя
+              <input
+                name="name"
+                defaultValue={user.name}
+                required
+                maxLength={50}
+              />
+            </label>
+            <label>
+              О себе
+              <textarea
+                name="bio"
+                defaultValue={user.bio}
+                maxLength={500}
+                rows={4}
+              />
+            </label>
+            <button className="primary" disabled={save.isPending}>
+              Сохранить <Check size={18} />
             </button>
-            <div className="small-label">ВАШ ПРОФИЛЬ</div>
-            <h2>Редактировать</h2>
-            <ProfileMediaEditor
-              user={user}
-              onUpdate={(u) => {
-                qc.setQueryData(
-                  ["me"],
-                  (old: { user: User; isAdmin?: boolean } | undefined) => ({
-                    ...old,
-                    user: u,
-                  }),
-                );
-                setProfile(u);
-                qc.invalidateQueries({ queryKey: ["chats"] });
-                qc.invalidateQueries({ queryKey: ["users"] });
-              }}
-            />
-            <MusicEditor
-              user={user}
-              onUpdate={(u) => {
-                qc.setQueryData(
-                  ["me"],
-                  (old: { user: User; isAdmin?: boolean } | undefined) => ({
-                    ...old,
-                    user: u,
-                  }),
-                );
-                setProfile(u);
-              }}
-            />
-            <LinksEditor
-              user={user}
-              onUpdate={(u) => {
-                qc.setQueryData(
-                  ["me"],
-                  (old: { user: User; isAdmin?: boolean } | undefined) => ({
-                    ...old,
-                    user: u,
-                  }),
-                );
-                setProfile(u);
-              }}
-            />
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                save.mutate({
-                  name: String(f.get("name")),
-                  bio: String(f.get("bio")),
-                });
-              }}
-            >
-              <label>
-                Имя
-                <input
-                  name="name"
-                  defaultValue={user.name}
-                  required
-                  maxLength={50}
-                />
-              </label>
-              <label>
-                О себе
-                <textarea
-                  name="bio"
-                  defaultValue={user.bio}
-                  maxLength={500}
-                  rows={4}
-                />
-              </label>
-              <button className="primary" disabled={save.isPending}>
-                Сохранить <Check size={18} />
-              </button>
-            </form>
-          </div>
-        </div>
+          </form>
+        </Dialog>
       )}
     </div>
   );
@@ -1829,13 +1843,14 @@ function Nav({
     ? [
         ["chats", "Чаты", MessagesSquare],
         ["feed", "Лента", AlignJustify],
-        ["wallet", "Кошелёк", WalletIcon],
+        ["market", "Маркет", Store],
         ["profile", "Профиль", CircleUserRound],
         ["settings", "Настройки", Settings],
       ]
     : [
         ["chats", "Сообщения", MessagesSquare],
         ["feed", "Лента", AlignJustify],
+        ["market", "Маркет", Store],
         ["wallet", "Кошелёк", WalletIcon],
         ["saved", "Избранное", Bookmark],
         ["profile", "Мой профиль", CircleUserRound],
@@ -1845,8 +1860,16 @@ function Nav({
       {items.map(([key, label, Icon]) => (
         <button
           key={key as string}
-          className={tab === key ? "active" : ""}
-          aria-current={tab === key ? "page" : undefined}
+          className={
+            tab === key || (mobile && tab === "wallet" && key === "market")
+              ? "active"
+              : ""
+          }
+          aria-current={
+            tab === key || (mobile && tab === "wallet" && key === "market")
+              ? "page"
+              : undefined
+          }
           aria-label={label as string}
           title={label as string}
           onClick={() => nav(key as string)}
@@ -1923,112 +1946,120 @@ function Profile({
           </button>
         }
       />
-      <section className="profile-identity-card">
-        <div
-          className={
-            "profile-cover " + (user.hasBanner ? "" : "profile-cover-default")
-          }
-          style={
-            user.hasBanner
-              ? {
-                  backgroundImage: `url(/api/users/${user.id}/media/banner?v=${user.mediaVersion || 0})`,
-                }
-              : undefined
-          }
-        >
-          {!user.hasBanner && (
-            <>
-              <span className="profile-cover-word">nimb</span>
-              <span className="profile-cover-caption">МЕСТО ДЛЯ СВОИХ</span>
-            </>
+      <div className="profile-layout">
+        <aside className="profile-summary">
+          <section className="profile-identity-card">
+            <div
+              className={
+                "profile-cover " +
+                (user.hasBanner ? "" : "profile-cover-default")
+              }
+              style={
+                user.hasBanner
+                  ? {
+                      backgroundImage: `url(/api/users/${user.id}/media/banner?v=${user.mediaVersion || 0})`,
+                    }
+                  : undefined
+              }
+            >
+              {!user.hasBanner && (
+                <>
+                  <span className="profile-cover-word">nimb</span>
+                  <span className="profile-cover-caption">МЕСТО ДЛЯ СВОИХ</span>
+                </>
+              )}
+            </div>
+            <div className="profile-overview">
+              <div className="profile-hero">
+                <div className="profile-identity">
+                  <Avatar user={user} size="large" />
+                  <div className="profile-title">
+                    <h2>
+                      <UserName user={user} />
+                    </h2>
+                    <span>@{user.username}</span>
+                    {user.online !== undefined && user.online !== null && (
+                      <small className="profile-status">
+                        {user.online ? "В сети" : "Не в сети"}
+                      </small>
+                    )}
+                  </div>
+                  <div className="profile-quick-actions">
+                    {own ? (
+                      <button
+                        className="outline compact-button"
+                        onClick={onEdit}
+                      >
+                        <Pencil size={16} />
+                        <span>Редактировать</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="icon-button"
+                          aria-label="Другие действия"
+                          onClick={() => setActionsOpen(!actionsOpen)}
+                        >
+                          <MoreHorizontal size={20} />
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label="Подарить подарок"
+                          onClick={() => {
+                            setProfileTab("gifts");
+                            setGiftOpen(true);
+                          }}
+                        >
+                          <Gift size={20} />
+                        </button>
+                        <button className="primary" onClick={onMessage}>
+                          <MessageCircle size={17} /> Написать
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {user.bio && <p className="profile-bio">{user.bio}</p>}
+                {user.bioPrivate && !own && (
+                  <p className="muted profile-bio">
+                    Описание скрыто владельцем.
+                  </p>
+                )}
+              </div>
+              <div className="profile-details">
+                <ProfileIdentifiers user={user} />
+                <ProfileLinks user={user} />
+                <div className="profile-meta">
+                  <span>
+                    <Hash size={15} /> ID {user.id}
+                  </span>
+                  <span>
+                    <CalendarDays size={15} /> С {date(user.createdAt)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+          {shareNotice && (
+            <p className="notice" role="status">
+              {shareNotice}
+            </p>
           )}
-        </div>
-        <div className="profile-overview">
-          <div className="profile-hero">
-            <div className="profile-identity">
-              <Avatar user={user} size="large" />
-              <div className="profile-title">
-                <h1>
-                  <UserName user={user} />
-                </h1>
-                <span>@{user.username}</span>
-                {user.online !== undefined && user.online !== null && (
-                  <small className="profile-status">
-                    {user.online ? "В сети" : "Не в сети"}
-                  </small>
-                )}
-              </div>
-              <div className="profile-quick-actions">
-                {own ? (
-                  <button className="outline compact-button" onClick={onEdit}>
-                    <Pencil size={16} />
-                    <span>Редактировать</span>
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      className="icon-button"
-                      aria-label="Другие действия"
-                      onClick={() => setActionsOpen(!actionsOpen)}
-                    >
-                      <MoreHorizontal size={20} />
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label="Подарить подарок"
-                      onClick={() => {
-                        setProfileTab("gifts");
-                        setGiftOpen(true);
-                      }}
-                    >
-                      <Gift size={20} />
-                    </button>
-                    <button className="primary" onClick={onMessage}>
-                      <MessageCircle size={17} /> Написать
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            {user.bio && <p className="profile-bio">{user.bio}</p>}
-            {user.bioPrivate && !own && (
-              <p className="muted profile-bio">Описание скрыто владельцем.</p>
-            )}
-          </div>
-          <div className="profile-details">
-            <ProfileIdentifiers user={user} />
-            <ProfileLinks user={user} />
-            <div className="profile-meta">
+          {!own && actionsOpen && <ProfileActions user={user} />}
+          {own && isAdmin && (
+            <button className="profile-admin-link" onClick={onAdmin}>
+              <Shield size={20} />
               <span>
-                <Hash size={15} /> ID {user.id}
+                <strong>Админ-панель</strong>
+                <small>Пользователи, нимбики и подарки</small>
               </span>
-              <span>
-                <CalendarDays size={15} /> С {date(user.createdAt)}
-              </span>
-            </div>
+              <ArrowUpRight size={18} />
+            </button>
+          )}
+          <div className="profile-about">
+            <Collections userId={user.id} own={own} section="badges" />
+            <ProfileMusic user={user} own={own} />
           </div>
-        </div>
-      </section>
-      {shareNotice && (
-        <p className="notice" role="status">
-          {shareNotice}
-        </p>
-      )}
-      {!own && actionsOpen && <ProfileActions user={user} />}
-      {own && isAdmin && (
-        <button className="profile-admin-link" onClick={onAdmin}>
-          <Shield size={20} />
-          <span>
-            <strong>Админ-панель</strong>
-            <small>Пользователи, нимбики и подарки</small>
-          </span>
-          <ArrowUpRight size={18} />
-        </button>
-      )}
-      <div className="profile-columns">
-        <aside className="profile-about">
-          <Collections userId={user.id} own={own} section="badges" />
-          <ProfileMusic user={user} own={own} />
         </aside>
         <section className="profile-collection">
           <div
