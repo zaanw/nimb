@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowLeft, Check, Search, Wallet, X } from "lucide-react";
-import { Dialog } from "./UI";
+import { Dialog, LoadingRows } from "./UI";
 import { GiftArtwork } from "./GiftArtwork";
 import { GiftCard, GiftDetails, type CollectibleGift } from "./CollectibleGift";
 
@@ -17,6 +17,7 @@ type Template = {
   issued: number;
   description: string;
   color: string;
+  rarity?: string;
 };
 async function request<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch("/api" + path, {
@@ -84,6 +85,9 @@ export function Market({
   } | null>(null);
   const [revealed, setRevealed] = useState<CollectibleGift | null>(null);
   const [notice, setNotice] = useState("");
+  const [rarity, setRarity] = useState("");
+  const [shopSort, setShopSort] = useState("catalog");
+  const [collectionSort, setCollectionSort] = useState("recent");
   const wallet = useQuery({
     queryKey: ["wallet"],
     queryFn: () => request<{ balance: number }>("/wallet"),
@@ -148,16 +152,27 @@ export function Market({
       );
     },
   });
-  const templates = (catalog.data?.templates || []).filter((item) =>
-    item.name.toLowerCase().includes(search.trim().toLowerCase()),
+  const query = search.trim().toLowerCase();
+  const catalogItems = catalog.data?.templates ?? [];
+  const rarities = Array.from(
+    new Set(catalogItems.flatMap((item) => (item.rarity ? [item.rarity] : []))),
   );
+  const templates = catalogItems.filter(
+    (item) =>
+      item.name.toLowerCase().includes(query) &&
+      (!rarity || item.rarity === rarity),
+  );
+  if (shopSort === "price-asc") templates.sort((a, b) => a.price - b.price);
+  if (shopSort === "price-desc") templates.sort((a, b) => b.price - a.price);
   const owned = (
-    collection.data?.pages.flatMap((page) => page.gifts) || []
+    collection.data?.pages.flatMap((page) => page.gifts ?? []) || []
   ).filter((item) =>
     `${item.name} ${item.serialNumber || item.id}`
       .toLowerCase()
-      .includes(search.trim().toLowerCase()),
+      .includes(query),
   );
+  if (collectionSort === "number")
+    owned.sort((a, b) => (a.serialNumber || a.id) - (b.serialNumber || b.id));
   return (
     <div className="market-screen">
       <header className="market-header">
@@ -232,7 +247,9 @@ export function Market({
           </button>
         </div>
         <div className="market-section-head">
-          <h2>{tab === "shop" ? "Магазин" : "Коллекционные подарки"}</h2>
+          <h2 className="sr-only">
+            {tab === "shop" ? "Магазин" : "Коллекционные подарки"}
+          </h2>
           <div className="market-search" role="search">
             <Search aria-hidden="true" size={16} />
             <input
@@ -243,7 +260,9 @@ export function Market({
               autoComplete="off"
               spellCheck={false}
               maxLength={100}
-              placeholder="Поиск…"
+              placeholder={
+                tab === "shop" ? "Название подарка" : "Название или номер"
+              }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -255,6 +274,48 @@ export function Market({
                 <X aria-hidden="true" size={14} />
               </button>
             )}
+          </div>
+          <div className="market-filters">
+            {tab === "shop" && rarities.length > 0 && (
+              <label>
+                <span>Редкость</span>
+                <select
+                  aria-label="Редкость"
+                  value={rarity}
+                  onChange={(event) => setRarity(event.target.value)}
+                >
+                  <option value="">Все</option>
+                  {rarities.map((value) => (
+                    <option value={value} key={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label>
+              <span>Сортировка</span>
+              {tab === "shop" ? (
+                <select
+                  aria-label="Сортировка"
+                  value={shopSort}
+                  onChange={(event) => setShopSort(event.target.value)}
+                >
+                  <option value="catalog">По умолчанию</option>
+                  <option value="price-asc">Сначала дешевле</option>
+                  <option value="price-desc">Сначала дороже</option>
+                </select>
+              ) : (
+                <select
+                  aria-label="Сортировка"
+                  value={collectionSort}
+                  onChange={(event) => setCollectionSort(event.target.value)}
+                >
+                  <option value="recent">Сначала новые</option>
+                  <option value="number">По номеру</option>
+                </select>
+              )}
+            </label>
           </div>
         </div>
         {notice && (
@@ -270,11 +331,7 @@ export function Market({
         >
           {tab === "shop" ? (
             <>
-              {catalog.isLoading && (
-                <p className="market-empty" role="status">
-                  Загрузка подарков…
-                </p>
-              )}
+              {catalog.isLoading && <LoadingRows label="Загрузка подарков…" />}
               {catalog.isError && (
                 <div className="error" role="alert">
                   <p>{catalog.error.message}</p>
@@ -301,7 +358,10 @@ export function Market({
                       <GiftArtwork template={item.id} lazy={index > 3} />
                     </div>
                     <div className="market-item-meta">
-                      <strong>{item.name}</strong>
+                      <span className="market-item-name">
+                        <strong>{item.name}</strong>
+                        {item.rarity && <small>{item.rarity}</small>}
+                      </span>
                       <span className="market-price">
                         {item.price.toLocaleString("ru-RU")}
                         <span>N</span>
@@ -319,9 +379,7 @@ export function Market({
           ) : (
             <>
               {collection.isLoading && (
-                <p className="market-empty" role="status">
-                  Загрузка коллекции…
-                </p>
+                <LoadingRows label="Загрузка коллекции…" />
               )}
               {collection.isError && (
                 <div className="error" role="alert">

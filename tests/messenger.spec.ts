@@ -47,7 +47,7 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
   const suffix = Date.now().toString(36);
   const names = ["e2ea" + suffix, "e2eb" + suffix];
   const desktop = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
+    viewport: { width: 1440, height: 900 },
   });
   const mobile = await browser.newContext({
     viewport: { width: 375, height: 812 },
@@ -117,9 +117,11 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
     const chatDetails = a.getByRole("complementary", {
       name: "Сведения о чате",
     });
+    const toggleDetails = a.getByRole("button", { name: "Детали чата" });
+    await expect(chatDetails).toHaveCount(0);
+    await toggleDetails.click();
     const attachedFile = chatDetails.getByRole("link", { name: /pepe\.webp/ });
     await expect(attachedFile).toHaveAttribute("href", /^\/api\/files\/\d+$/);
-    const toggleDetails = a.getByRole("button", { name: "Детали чата" });
     await toggleDetails.click();
     await expect(chatDetails).toBeHidden();
     await toggleDetails.click();
@@ -128,6 +130,8 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
       (process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-studio-evidence") +
       "/scenarios";
     await mkdir(out, { recursive: true });
+    await a.screenshot({ path: out + "/real-chat-details.png" });
+    await toggleDetails.click();
     await a.screenshot({ path: out + "/real-chat-desktop.png" });
     await b.screenshot({ path: out + "/real-chat-phone.png" });
     await a
@@ -169,6 +173,57 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
     await expect(
       b.getByText("Проверка настоящего профиля", { exact: true }),
     ).toBeVisible();
+    const input = a.getByRole("textbox", { name: "Сообщение", exact: true });
+    await input.fill("Проверка эмодзи");
+    await input.press("End");
+    await a.getByRole("button", { name: "Эмодзи", exact: true }).click();
+    await a.getByRole("button", { name: "Улыбка", exact: true }).click();
+    await expect(input).toHaveValue("Проверка эмодзи😊");
+    await input.press("Shift+Enter");
+    await input.pressSequentially("Nimb");
+    await expect(input).toHaveValue("Проверка эмодзи😊\nNimb");
+    await input.press("Enter");
+    await expect(
+      a.locator(".message-area").getByText(/Проверка эмодзи😊/),
+    ).toBeVisible();
+    await a
+      .getByRole("button", { name: "Создать группу или канал", exact: true })
+      .click();
+    const create = a.getByRole("dialog", { name: "Создать пространство" });
+    await create
+      .getByRole("combobox", { name: "Тип", exact: true })
+      .selectOption("channel");
+    await create.getByLabel("Название", { exact: true }).fill("Заметки Nimb");
+    await create
+      .getByLabel("Описание", { exact: true })
+      .fill("Новости тестового канала");
+    await create
+      .getByRole("button", { name: "Создать", exact: true })
+      .last()
+      .click();
+    await expect(a.locator(".channel-thread")).toBeVisible();
+    await expect(toggleDetails).toHaveAttribute("aria-expanded", "false");
+    await input.fill("Первая публикация канала");
+    await input.press("Enter");
+    await expect(
+      a
+        .locator(".message-area")
+        .getByText("Первая публикация канала", { exact: true }),
+    ).toBeVisible();
+    await a.screenshot({ path: out + "/real-channel.png" });
+    await a.locator(".chat-header .person-button").click();
+    const channel = a.getByRole("dialog", { name: "О канале" });
+    await expect(channel.locator(".community-description")).toHaveText(
+      "Новости тестового канала",
+    );
+    await channel
+      .getByRole("button", { name: "Создать ссылку приглашения" })
+      .click();
+    const invite = channel.getByLabel("Ссылка приглашения");
+    await expect(invite).toHaveValue(/\?invite=/);
+    const inviteURL = await invite.inputValue();
+    await a.keyboard.press("Escape");
+    await expect(channel).toBeHidden();
     await navigate(b, "Лента");
     await b
       .getByLabel("Текст публикации", { exact: true })
@@ -227,6 +282,17 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    await b.goto(inviteURL);
+    await b
+      .getByRole("dialog", { name: "Вступить по ссылке" })
+      .getByRole("button", { name: "Вступить", exact: true })
+      .last()
+      .click();
+    await expect(b.locator(".channel-thread .message-text")).toContainText(
+      "Первая публикация канала",
+    );
+    await expect(b.getByRole("textbox", { name: "Сообщение" })).toHaveCount(0);
+    await b.screenshot({ path: out + "/real-channel-phone.png" });
   } finally {
     await desktop.close();
     await mobile.close();

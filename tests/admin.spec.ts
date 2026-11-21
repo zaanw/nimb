@@ -153,7 +153,7 @@ async function adminFixture(page: Page) {
   } else {
     await openNavigation(page);
     await page
-      .locator(".app-topbar")
+      .locator(".workspace-sidebar")
       .getByRole("button", { name: /Админ-панель/ })
       .click();
   }

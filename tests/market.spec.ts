@@ -127,3 +127,24 @@ test("catalog errors can be retried, without a fake empty grid", async ({
   await page.getByRole("button", { name: "Повторить", exact: true }).click();
   await expect(page.locator(".market-item")).toHaveCount(8);
 });
+
+test("market filters catalog gifts and sorts the loaded collection by serial", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await redesignFixture(page);
+  await page.goto("/?tab=market");
+  const market = page.locator(".market-screen");
+  const filters = market.locator(".market-filters");
+  await filters.getByLabel("Редкость").selectOption("Редкий");
+  await filters.getByLabel("Сортировка").selectOption("price-desc");
+  const offers = market.locator(".market-grid .market-item");
+  await expect(offers).toHaveCount(2);
+  await expect(offers.first()).toContainText("Stellar Rocket");
+  await expect(offers.last()).toContainText("Pretty Posy");
+  await market.getByRole("tab", { name: "Моя коллекция" }).click();
+  await filters.getByLabel("Сортировка").selectOption("number");
+  await expect(
+    market.locator(".market-owned-grid .gift-tile").first(),
+  ).toHaveAccessibleName("Plush Pepe #18");
+});

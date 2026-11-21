@@ -5,7 +5,7 @@ import { navigate } from "./navigation";
 
 const evidence =
   process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-studio-evidence";
-test("all primary screens fit the four release widths, with screenshots and keyboard/motion checks", async ({
+test("all primary screens fit the five release widths, with screenshots and keyboard/motion checks", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 900 });
@@ -14,7 +14,7 @@ test("all primary screens fit the four release widths, with screenshots and keyb
   await redesignFixture(page);
   await page.goto("/");
   const measurements: unknown[] = [];
-  for (const width of [375, 768, 1280, 1920]) {
+  for (const width of [375, 768, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     const directory = `${evidence}/after/${width}`;
     await mkdir(directory, { recursive: true });
@@ -68,13 +68,9 @@ test("all primary screens fit the four release widths, with screenshots and keyb
     await expect(page.locator(".conversation-placeholder")).toBeAttached();
     await capture("chat-list");
     if (width > 760) {
-      const menu = page.getByRole("button", { name: "Меню разделов" });
-      await menu.click();
       await expect(
         page.getByRole("navigation", { name: "Разделы Nimb" }),
       ).toBeVisible();
-      await capture("menu");
-      await page.keyboard.press("Escape");
     }
     await page.locator(".chat-list-item").click();
     await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
@@ -86,6 +82,21 @@ test("all primary screens fit the four release widths, with screenshots and keyb
         ),
     ).toBe(true);
     await capture("chat");
+    if (width > 760) {
+      const panel = page.getByRole("complementary", {
+        name: "Сведения о чате",
+      });
+      const trigger = page.getByRole("button", { name: "Детали чата" });
+      await expect(panel).toHaveCount(0);
+      await trigger.click();
+      await expect(panel).toBeVisible();
+      await panel.getByRole("button", { name: "Подарки", exact: true }).click();
+      await expect(panel.locator(".gift-tile").first()).toBeVisible();
+      await capture("chat-details");
+      await page.keyboard.press("Escape");
+      await expect(panel).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    }
     if (width <= 760)
       await page.getByRole("button", { name: "Назад", exact: true }).click();
     for (const [label, heading, file] of [
@@ -218,7 +229,11 @@ test("all primary screens fit the four release widths, with screenshots and keyb
   await writeFile(
     evidence + "/responsive-results.json",
     JSON.stringify(
-      { widths: [375, 768, 1280, 1920], measurements, pageErrors: errors },
+      {
+        widths: [375, 768, 1280, 1440, 1920],
+        measurements,
+        pageErrors: errors,
+      },
       null,
       2,
     ),
@@ -300,7 +315,7 @@ test("login and registration remain readable at every release width", async ({
     }),
   );
   await page.goto("/");
-  for (const width of [375, 768, 1280, 1920]) {
+  for (const width of [375, 768, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(
       page.getByRole("button", { name: "Войти", exact: true }),

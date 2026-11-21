@@ -27,6 +27,7 @@ export function MessageBubble({
   showViews,
   sender,
   canPin,
+  latest = false,
   onReply,
   onForward,
   onError,
@@ -37,6 +38,7 @@ export function MessageBubble({
   showViews: boolean;
   sender?: string | Identity;
   canPin: boolean;
+  latest?: boolean;
   onReply: (m: Message) => void;
   onForward: (m: Message) => void;
   onError: (s: string) => void;
@@ -84,7 +86,7 @@ export function MessageBubble({
   return (
     <div className={"message-row " + (m.senderId === me ? "mine" : "")}>
       <motion.div
-        initial={{ opacity: 0, y: 4 }}
+        initial={latest ? { opacity: 0, y: 4 } : false}
         animate={{ opacity: 1, y: 0 }}
         className={compact ? "bubble bubble-compact" : "bubble"}
       >

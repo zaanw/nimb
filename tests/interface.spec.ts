@@ -96,7 +96,12 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
   await page.locator(".chat-list-item").click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
   await expect(page.locator(".conversation-list")).toBeVisible();
-  await expect(page.locator(".app-topbar")).toBeVisible();
+  await expect(page.locator(".workspace-sidebar")).toBeVisible();
+  await expect(page.locator(".app-topbar")).toHaveCount(0);
+  await expect(page.locator(".mobile-nav")).toBeHidden();
+  await expect(
+    page.getByRole("complementary", { name: "Сведения о чате" }),
+  ).toHaveCount(0);
   const layout = await page.evaluate(() => {
     const list = document
       .querySelector(".conversation-list")!
@@ -108,6 +113,9 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
       .querySelector(".composer")!
       .getBoundingClientRect();
     return {
+      sidebarWidth: document
+        .querySelector(".workspace-sidebar")!
+        .getBoundingClientRect().width,
       adjacent: chat.left >= list.right && chat.left - list.right <= 12,
       wide: chat.width > 650,
       visibleComposer: composer.bottom <= innerHeight,
@@ -115,6 +123,7 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
     };
   });
   expect(layout).toEqual({
+    sidebarWidth: 280,
     adjacent: true,
     wide: true,
     visibleComposer: true,
@@ -189,14 +198,14 @@ test("ordinary accounts have no administration entry in navigation, profile or s
   );
   await openNavigation(page);
   await page
-    .locator(".app-topbar")
+    .locator(".workspace-sidebar")
     .getByRole("button", { name: "Мой профиль", exact: true })
     .click();
   await expect(page.locator(".profile-identity")).toBeVisible();
   await expect(page.locator(".profile-admin-link")).toHaveCount(0);
   await openNavigation(page);
   await page
-    .locator(".app-topbar")
+    .locator(".workspace-sidebar")
     .getByRole("button", { name: "Настройки", exact: true })
     .click();
   await expect(
@@ -212,7 +221,7 @@ test("settings keep desktop navigation and switch to a back button on phones", a
   await fixture(page);
   await openNavigation(page);
   await page
-    .locator(".app-topbar")
+    .locator(".workspace-sidebar")
     .getByRole("button", { name: "Настройки", exact: true })
     .click();
   const menu = page.getByRole("complementary", { name: "Разделы настроек" });
@@ -572,19 +581,15 @@ test("desktop settings and profile open above the conversation and return to its
   await page.locator(".chat-list-item").click();
   const composer = page.getByLabel("Сообщение", { exact: true });
   await composer.fill("Черновик");
-  const bar = page.locator(".app-topbar");
-  const menu = bar.getByRole("button", { name: "Меню разделов" });
+  const bar = page.locator(".workspace-sidebar");
   const options = bar.getByRole("navigation", { name: "Разделы Nimb" });
-  await menu.focus();
-  await page.keyboard.press("Enter");
-  await expect(options).toBeVisible();
+  const chats = options.getByRole("button", { name: "Чаты", exact: true });
+  await expect(chats).toHaveAttribute("aria-current", "page");
+  await chats.focus();
   await page.keyboard.press("Tab");
   await expect(
-    options.getByRole("button", { name: "Чаты", exact: true }),
+    options.getByRole("button", { name: "Лента", exact: true }),
   ).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(options).toBeHidden();
-  await expect(menu).toBeFocused();
   await expect(composer).toHaveValue("Черновик");
   for (const title of ["Настройки", "Мой профиль"]) {
     const trigger = bar.getByRole("button", { name: title, exact: true });
