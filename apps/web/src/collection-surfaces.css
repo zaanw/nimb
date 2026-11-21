@@ -1,0 +1,519 @@
+/* The catalog is a narrow shelf. Its bright objects sit inside neutral app chrome. */
+.market-open .page-workspace {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg);
+}
+
+.market-open .content-screen,
+.market-open .market-screen {
+  max-width: none;
+}
+
+.market-screen .market-header {
+  min-height: 60px;
+  height: auto;
+  margin: 0;
+  padding: 8px clamp(12px, 3vw, 28px);
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.market-screen .market-header h1 {
+  font-size: clamp(20px, 2vw, 23px);
+  font-weight: 590;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.market-screen .market-header > div {
+  min-width: 0;
+  gap: 9px;
+}
+
+.market-screen .market-back,
+.market-screen .market-balance {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.market-screen .market-back {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: none;
+}
+
+.market-screen .market-balance {
+  gap: 7px;
+  min-width: 74px;
+  font-size: 14px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.market-screen .market-balance svg {
+  color: var(--accent);
+}
+
+.market-screen .market-back:hover,
+.market-screen .market-balance:hover {
+  background: var(--raised);
+}
+
+.market-screen .market-content {
+  width: min(100%, 540px);
+  max-width: none;
+  margin: 0 auto;
+  padding: 20px 12px 32px;
+}
+
+.market-screen .market-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #09090a;
+}
+
+.market-screen .market-tabs button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.market-screen .market-tabs button[aria-selected="true"] {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.market-screen .market-tabs button:hover:not([aria-selected="true"]) {
+  color: var(--text);
+}
+
+.market-screen .market-section-head {
+  align-items: center;
+  min-height: 44px;
+  margin: 0 0 12px;
+  gap: 8px;
+}
+
+.market-screen .market-section-head h2 {
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.28;
+  color: var(--secondary);
+}
+
+.market-screen .market-search {
+  width: 168px;
+  min-width: 0;
+  min-height: 44px;
+  gap: 6px;
+  padding: 0 8px 0 10px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.market-screen .market-search input {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+.market-screen .market-search button {
+  flex: none;
+  width: 26px;
+  min-height: 30px;
+  border-radius: 8px;
+}
+
+.market-screen .market-search button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.market-screen .market-grid,
+.market-screen .market-owned-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(6px, 2vw, 12px);
+}
+
+.market-screen .market-item {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+  min-height: 0;
+  padding: 6px 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: clamp(13px, 3vw, 23px);
+  background: var(--surface);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.market-screen .market-item:hover {
+  border-color: var(--line-strong);
+  background: var(--raised);
+}
+
+.market-screen .market-item-art {
+  width: 100%;
+  aspect-ratio: 1.12;
+  background: none;
+}
+
+.market-screen .market-item .gift-artwork {
+  width: 86%;
+  height: 92%;
+  max-width: 132px;
+  max-height: 132px;
+}
+
+.market-screen .market-item-meta {
+  min-width: 0;
+  gap: 5px;
+  padding: 2px 2px 0;
+}
+
+.market-screen .market-item-meta strong {
+  width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: clamp(11px, 2vw, 13px);
+  line-height: 1.24;
+  font-weight: 520;
+}
+
+.market-screen .market-price {
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  background: var(--raised);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.market-screen .market-price > span {
+  order: -1;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.market-screen .market-owned-grid .gift-tile.is-collectible {
+  border-radius: clamp(13px, 3vw, 21px);
+  padding-bottom: 9px;
+  contain-intrinsic-size: auto 190px;
+}
+
+.market-screen .market-owned-grid .gift-tile.is-collectible .gift-tile-name,
+.market-screen .market-owned-grid .gift-traits {
+  margin: 8px 8px 0;
+}
+
+.market-screen .market-owned-grid .gift-traits {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.market-screen .market-empty {
+  padding: 32px 12px;
+  border: 0;
+}
+
+.market-purchase-dialog {
+  background: var(--surface);
+  border-radius: 23px;
+}
+
+.market-purchase-dialog .market-purchase-art {
+  height: min(168px, 26dvh);
+}
+
+.market-purchase-dialog .market-purchase-art .gift-artwork {
+  width: min(164px, 24dvh);
+  height: min(164px, 24dvh);
+}
+
+.market-purchase-dialog .market-purchase-facts,
+.gift-facts.collectible-facts {
+  background: var(--bg);
+  border-color: var(--line);
+}
+
+.collectible-dialog {
+  border-radius: 24px;
+  background: var(--bg);
+}
+
+.collectible-dialog .collectible-hero {
+  padding-block: 10px 18px;
+}
+
+.collectible-dialog .collectible-hero .gift-scene {
+  height: clamp(124px, 23dvh, 190px);
+}
+
+.collectible-dialog .collectible-hero .gift-artwork {
+  width: clamp(110px, 21dvh, 176px);
+  height: clamp(110px, 21dvh, 176px);
+}
+
+.collectible-dialog .collectible-hero h2 {
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.collectible-dialog .collectible-hero h2,
+.collectible-dialog .collectible-hero p {
+  text-shadow: 0 1px 4px #0009;
+}
+
+.collectible-dialog .collectible-facts > div {
+  grid-template-columns: minmax(98px, 31%) minmax(0, 1fr);
+}
+
+.collectible-dialog .collectible-facts dt {
+  background: var(--surface);
+}
+
+/* Balance and address management read as sections of the same window. */
+.wallet-workspace .wallet-screen {
+  max-width: 670px;
+}
+
+.wallet-screen .page-heading {
+  margin: 0 0 14px;
+  gap: 12px;
+}
+
+.wallet-screen .page-heading p {
+  display: none;
+}
+
+.wallet-screen .wallet-grid,
+.wallet-screen .wallet-grid > .wallet-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: auto;
+  align-items: start;
+  gap: 11px;
+}
+
+.wallet-screen .wallet-grid > .wallet-column > * {
+  grid-row: auto;
+  grid-column: 1;
+}
+
+.wallet-workspace .wallet-screen .wallet-balance-card {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 1fr;
+  align-items: baseline;
+  min-height: 0;
+  padding: 15px 16px;
+  border-color: var(--line);
+  border-radius: 16px;
+  row-gap: 5px;
+  column-gap: 8px;
+}
+
+.wallet-screen .wallet-balance-card .wallet-balance-label {
+  grid-column: 1/-1;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.wallet-screen .wallet-balance-card .balance-unit {
+  color: var(--muted);
+}
+
+.wallet-screen .wallet-balance-label > svg {
+  color: var(--link);
+}
+
+.wallet-screen .wallet-balance-card .balance-number {
+  margin: 0;
+  font-size: clamp(27px, 5vw, 36px);
+}
+
+.wallet-screen .wallet-balance-bottom {
+  grid-column: 1/-1;
+  margin: 0;
+}
+
+.wallet-workspace .wallet-screen .wallet-note {
+  order: 0;
+  padding: 4px 3px;
+  background: none;
+}
+
+.wallet-workspace .wallet-screen .wallet-card {
+  padding: clamp(13px, 3vw, 19px);
+  border-color: var(--line);
+  border-radius: 16px;
+}
+
+.wallet-screen .wallet-card-heading {
+  margin-bottom: 10px;
+}
+
+.wallet-screen .wallet-ownership-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.wallet-screen .wallet-ownership-item {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.wallet-screen .wallet-ownership-item:last-child {
+  border-bottom: 0;
+}
+
+.wallet-screen .wallet-owned-icon {
+  border-radius: 11px;
+  color: var(--accent);
+}
+
+.wallet-screen .wallet-collection-tabs {
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.wallet-screen .wallet-collection-tabs button {
+  flex: 1;
+  min-height: 38px;
+  min-width: 0;
+}
+
+.wallet-screen .wallet-collection-tabs button[aria-selected="true"] {
+  background: var(--surface);
+}
+
+.wallet-screen .wallet-column > .context-card {
+  background: none;
+  box-shadow: none;
+  border: 0;
+  padding: 6px 3px 0;
+}
+
+.wallet-screen .wallet-presets {
+  flex-wrap: wrap;
+}
+
+/* A single reading column and a compact composer keep posting in the same rhythm as chat. */
+.page-workspace .content-screen:has(> .feed-layout) {
+  max-width: 674px;
+}
+
+.content-screen:has(> .feed-layout) > .page-heading {
+  margin-bottom: 16px;
+}
+
+.feed-layout:has(.feed-aside) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+}
+
+.feed-layout .feed-aside {
+  display: none;
+}
+
+.feed-layout .feed-tabs {
+  gap: 6px;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  margin-bottom: 12px;
+}
+
+.feed-layout .feed-tabs > button {
+  line-height: 1.2;
+  min-height: 42px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.feed-layout .feed-tabs > button.active {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.feed-layout .post-compose {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--surface);
+}
+
+.feed-layout .post-compose textarea {
+  min-height: 68px;
+  background: var(--bg);
+}
+
+.feed-layout .feed-empty {
+  padding: 38px 16px;
+  border: 0;
+  background: transparent;
+}
+
+.feed-layout .post {
+  padding: 18px 0;
+}
+
+.feed-layout .post-image {
+  border-radius: 12px;
+}
+
+@media (max-width: 400px) {
+  .market-screen .market-section-head h2 {
+    font-size: 13px;
+  }
+
+  .market-screen .market-search input {
+    font-size: 16px;
+  }
+
+  .feed-layout .feed-tabs {
+    gap: 2px;
+  }
+
+  .feed-layout .feed-tabs > button {
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-screen .market-item {
+    transition: none;
+  }
+}

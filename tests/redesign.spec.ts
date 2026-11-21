@@ -4,7 +4,7 @@ import { redesignFixture } from "./fixtures/redesign";
 import { navigate } from "./navigation";
 
 const evidence =
-  process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-rooms-evidence";
+  process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-graphite-evidence";
 test("all primary screens fit the four release widths, with screenshots and keyboard/motion checks", async ({
   page,
 }) => {
@@ -56,9 +56,18 @@ test("all primary screens fit the four release widths, with screenshots and keyb
       measurements.push({ width, screen, ...bounds });
       await page.screenshot({ path: `${directory}/${screen}.png` });
     }
-    await navigate(page, width <= 760 ? "Чаты" : "Сообщения");
+    await navigate(page, "Чаты");
     await expect(page.locator(".conversation-placeholder")).toBeAttached();
     await capture("chat-list");
+    if (width > 760) {
+      const menu = page.getByRole("button", { name: "Меню разделов" });
+      await menu.click();
+      await expect(
+        page.getByRole("navigation", { name: "Разделы Nimb" }),
+      ).toBeVisible();
+      await capture("menu");
+      await page.keyboard.press("Escape");
+    }
     await page.locator(".chat-list-item").click();
     await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
     expect(

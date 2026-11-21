@@ -138,7 +138,7 @@ async function fixture(
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Сообщения", exact: true }),
+    page.getByRole("heading", { name: "Чаты", exact: true }),
   ).toBeVisible();
   return {
     subscribed: () => subscribed,

@@ -1,0 +1,515 @@
+/* Profile and settings share the workspace's graphite palette. */
+.workspace-dialog {
+  --panel-ink: #f0f0f3;
+  --panel-muted: #a5a5af;
+  --panel-edge: #ffffff1a;
+  --panel-highlight: #aabfe9;
+}
+
+.overlay:has(> .settings-dialog) {
+  background: #0009;
+  backdrop-filter: blur(5px);
+}
+
+.overlay:has(> .profile-dialog) {
+  background: #000a;
+}
+
+.profile-dialog.workspace-dialog {
+  width: min(516px, 100%);
+  max-width: 516px;
+  max-height: calc(100dvh - 32px);
+  background: #131316;
+  border: 1px solid var(--panel-edge);
+  border-radius: 22px;
+  scrollbar-width: thin;
+}
+
+.profile-dialog.workspace-dialog .close,
+.settings-dialog.workspace-dialog .close,
+.profile-heading-tools .icon-button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: #ffffff0b;
+  border: 1px solid #ffffff16;
+  border-radius: 50%;
+  color: var(--panel-ink, var(--text));
+  padding: 0;
+}
+
+.profile-dialog.workspace-dialog .close,
+.settings-dialog.workspace-dialog .close {
+  top: 12px;
+  right: 14px;
+}
+
+.profile-dialog.workspace-dialog .close:hover,
+.settings-dialog.workspace-dialog .close:hover,
+.profile-heading-tools .icon-button:hover {
+  background: #ffffff18;
+}
+
+.profile-heading-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-dialog .profile {
+  padding: 12px 21px 24px;
+}
+
+.profile-dialog .profile .page-heading {
+  min-height: 34px;
+  margin: 0 0 12px;
+  padding-right: 34px;
+}
+
+.profile-dialog .profile .page-heading h1 {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--panel-muted);
+}
+
+.profile .profile-cover {
+  border-radius: 14px;
+  height: 128px;
+}
+
+.profile .profile-identity-card:has(.profile-cover-default) .profile-hero {
+  padding-top: 0;
+}
+
+.profile .profile-identity {
+  gap: 9px;
+  padding-bottom: 12px;
+}
+
+.profile .profile-identity .avatar.large {
+  width: 94px;
+  height: 94px;
+  font-size: 34px;
+  background-color: #262630;
+  border-color: #131316;
+}
+
+.profile .profile-title h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.profile .profile-status {
+  margin-top: 5px;
+  padding: 2px 8px;
+  border: 1px solid #ffffff1c;
+  background: transparent;
+  font-size: 11px;
+}
+
+.profile .profile-quick-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.profile .profile-quick-actions > button {
+  min-width: 0;
+  min-height: 38px;
+  border-radius: 10px;
+}
+
+.profile .profile-quick-actions > .primary {
+  background: #c8d7f3;
+  color: #202a3b;
+}
+
+.profile .profile-quick-actions > .outline {
+  background: #fff1;
+  color: var(--text);
+}
+
+.profile .profile-hero,
+.profile .profile-details {
+  padding-inline: 0;
+}
+
+.profile .profile-hero {
+  padding-bottom: 10px;
+}
+
+.profile .profile-bio {
+  font-size: 14px;
+  line-height: 1.48;
+  overflow-wrap: anywhere;
+}
+
+.profile .profile-addresses {
+  padding: 2px 0;
+}
+
+.profile .profile-address-row {
+  padding: 7px 0;
+}
+
+.profile .profile-address-copy > small,
+.profile .profile-also {
+  font-size: 12px;
+}
+
+.profile .profile-address {
+  color: var(--panel-highlight, var(--link));
+  font-size: 14px;
+}
+
+.profile .profile-meta {
+  gap: 10px 14px;
+  margin: 3px 0 0;
+  padding: 10px 0;
+}
+
+.profile .profile-meta span {
+  font-size: 12px;
+}
+
+.profile .profile-details > .collection-section {
+  padding: 8px 0;
+  margin-top: 4px;
+}
+
+.profile .profile-details .profile-links {
+  margin-top: 4px;
+}
+
+.profile .profile-about {
+  gap: 9px;
+  margin: 4px 0 0;
+}
+
+.profile .profile-about .list-top {
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.profile .profile-collection {
+  margin-top: 13px;
+}
+
+.profile .profile-tabs {
+  gap: 6px;
+  padding: 0;
+  margin-bottom: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: transparent;
+}
+
+.profile .profile-tabs > button {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+}
+
+.profile .profile-tabs > button.active {
+  background: #ffffff0b;
+}
+
+.profile .profile-tabs > button.active::after {
+  content: "";
+  position: absolute;
+  inset: auto 7px 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--panel-highlight, var(--link));
+}
+
+.profile .profile-collection .gifts-section > .muted {
+  padding: 22px 12px;
+  border: 1px solid var(--line);
+  background: #ffffff04;
+  border-radius: 10px;
+}
+
+.settings-dialog.workspace-dialog {
+  width: min(928px, calc(100vw - 32px));
+  max-width: 928px;
+  max-height: calc(100dvh - 32px);
+  background: #1c1c20;
+  border: 1px solid #ffffff23;
+  border-radius: 14px;
+  box-shadow: 0 22px 65px #0006;
+}
+
+.settings-dialog .settings-screen {
+  height: min(704px, calc(100dvh - 34px));
+  max-height: none;
+}
+
+.settings-dialog .settings-heading {
+  flex: none;
+  padding: 15px 56px 15px 17px;
+  background: #242428;
+  border-color: #ffffff11;
+}
+
+.settings-dialog .settings-heading h1 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.settings-dialog .settings-layout {
+  flex: 1;
+  grid-template-columns: minmax(192px, 224px) minmax(0, 1fr);
+}
+
+.settings-dialog .settings-navigation {
+  padding: 10px 9px 12px;
+  border-right-color: #ffffff10;
+  background: #242428;
+  scrollbar-width: thin;
+}
+
+.settings-dialog .settings-content {
+  padding: 22px clamp(18px, 3.5vw, 44px);
+  background: #1c1c20;
+  scrollbar-width: thin;
+}
+
+.settings-screen .settings-search {
+  gap: 7px;
+  margin: 0 2px 9px;
+  min-height: 32px;
+  padding: 4px 8px;
+  background: #ffffff0b;
+  border: 1px solid #ffffff0b;
+  border-radius: 7px;
+}
+
+.settings-screen .settings-search:focus-within {
+  outline: 2px solid var(--panel-highlight, var(--link));
+  outline-offset: 1px;
+}
+
+.settings-screen .settings-search input {
+  background: transparent;
+  border: none;
+}
+
+.settings-dialog .settings-profile {
+  margin-bottom: 4px;
+  min-height: 47px;
+  padding: 5px 8px;
+}
+
+.settings-dialog .settings-profile:hover {
+  background: #ffffff08;
+}
+
+.settings-dialog .settings-group {
+  margin-top: 10px;
+}
+
+.settings-dialog .settings-group h2 {
+  margin: 0 7px 3px;
+  font-size: 11px;
+  color: var(--panel-muted);
+}
+
+.settings-dialog .settings-list button {
+  min-height: 32px;
+  gap: 7px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: var(--panel-ink);
+}
+
+.settings-dialog .settings-list button:hover {
+  background: #ffffff0c;
+}
+
+.settings-dialog .settings-list button.active {
+  background: #cbd2e1;
+  color: #192130;
+  font-weight: 500;
+}
+
+.settings-dialog .settings-list button.active > svg:last-child {
+  color: #283649;
+}
+
+.settings-screen .settings-list .setting-icon {
+  width: 21px;
+  height: 21px;
+  border-radius: 6px;
+  background: var(--setting-icon-bg, #393940);
+  color: #f7f7fc;
+}
+
+.settings-screen .settings-list .setting-icon.blue {
+  --setting-icon-bg: #385e9b;
+}
+
+.settings-screen .settings-list .setting-icon.purple {
+  --setting-icon-bg: #6b4e91;
+}
+
+.settings-screen .settings-list .setting-icon.red {
+  --setting-icon-bg: #943e53;
+}
+
+.settings-screen .settings-list .setting-icon.orange {
+  --setting-icon-bg: #885429;
+}
+
+.settings-screen .settings-list .setting-icon.green {
+  --setting-icon-bg: #32654e;
+}
+
+.settings-screen .settings-list .setting-icon.cyan {
+  --setting-icon-bg: #356471;
+}
+
+.settings-dialog .settings-navigation .logout {
+  margin-top: 13px;
+}
+
+.settings-screen .settings-overview-person {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-bottom: 25px;
+  padding: 12px;
+  border: 1px solid var(--panel-edge, var(--line));
+  border-radius: 10px;
+  background: #ffffff05;
+}
+
+.settings-screen .settings-overview-person > .avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
+}
+
+.settings-screen .settings-account-name h2 {
+  font-size: 17px;
+}
+
+.settings-screen .settings-account-name p {
+  margin-top: 3px;
+}
+
+.settings-screen .settings-overview-person > .outline {
+  grid-column: auto;
+  justify-self: end;
+  color: var(--panel-ink, var(--text));
+}
+
+.settings-screen .settings-quick-title {
+  margin: 0 0 8px 3px;
+  color: var(--panel-muted, var(--muted));
+}
+
+.settings-screen .settings-overview-links {
+  background: #ffffff05;
+  border: 1px solid var(--panel-edge, var(--line));
+  border-radius: 10px;
+}
+
+.settings-screen .settings-overview-links > button {
+  gap: 11px;
+  min-height: 54px;
+  padding: 9px 12px;
+}
+
+.settings-screen .settings-overview-links > button:hover {
+  background: #ffffff08;
+}
+
+.settings-screen .settings-overview-links > button:last-child {
+  border-bottom: 0;
+}
+
+.settings-screen .settings-overview-links small {
+  margin-top: 3px;
+}
+
+.settings-screen .setting-detail > h2 {
+  margin: 0 0 13px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.settings-screen .setting-detail > .privacy-option {
+  margin: 0;
+  padding: 11px 12px;
+  background: #ffffff06;
+  border: 1px solid var(--panel-edge, var(--line));
+}
+
+.settings-screen .setting-detail > .privacy-option:first-of-type {
+  margin-top: 20px;
+  border-radius: 9px 9px 0 0;
+}
+
+.settings-screen .setting-detail > .privacy-option + .privacy-option {
+  border-top: 0;
+  border-radius: 0 0 9px 9px;
+}
+
+.settings-screen .setting-detail > .privacy-select {
+  margin-top: 17px;
+}
+
+@media (max-width: 760px) {
+  .profile-dialog .profile {
+    padding-inline: 15px;
+  }
+
+  .profile .profile-heading-tools .icon-button,
+  .profile-dialog.workspace-dialog .close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .profile-dialog .profile .page-heading {
+    min-height: 44px;
+    padding-right: 44px;
+  }
+
+  .profile .profile-quick-actions > button {
+    min-height: 44px;
+  }
+
+  .profile .profile-identity .avatar.large {
+    width: 83px;
+    height: 83px;
+    font-size: 28px;
+  }
+
+  .profile .profile-tabs > button {
+    min-height: 44px;
+  }
+
+  .settings-screen .settings-search {
+    min-height: 44px;
+    padding-inline: 11px;
+  }
+
+  .settings-screen .settings-list .setting-icon {
+    width: 25px;
+    height: 25px;
+  }
+
+  .settings-screen .settings-overview-person {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+}

@@ -35,7 +35,7 @@ async function register(page: Page, username: string, name: string) {
     .getByRole("button", { name: "Создать аккаунт", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Сообщения", exact: true }),
+    page.getByRole("heading", { name: "Чаты", exact: true }),
   ).toBeVisible();
 }
 test("real accounts register, log in, exchange messages and attachments, edit a profile and publish from a phone", async ({
@@ -114,7 +114,9 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
       buffer: image,
     });
     await expect(b.getByAltText("pepe.webp", { exact: true })).toBeVisible();
-    const out = "/workspace/nimb-redesign-evidence-20261120/scenarios";
+    const out =
+      (process.env.NIMB_DESIGN_EVIDENCE ||
+        "/workspace/nimb-graphite-evidence") + "/scenarios";
     await mkdir(out, { recursive: true });
     await a.screenshot({ path: out + "/real-chat-desktop.png" });
     await b.screenshot({ path: out + "/real-chat-phone.png" });

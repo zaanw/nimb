@@ -28,9 +28,11 @@ export async function navigate(page: Page, label: string) {
         .click();
   } else {
     await openNavigation(page);
-    await page
-      .locator(".app-topbar")
-      .getByRole("button", { name: label, exact: true })
-      .click();
+    const bar = page.locator(".app-topbar");
+    const destination = bar.getByRole("button", { name: label, exact: true });
+    if (!(await destination.count())) {
+      await bar.getByRole("button", { name: "Меню разделов" }).click();
+    }
+    await destination.click();
   }
 }

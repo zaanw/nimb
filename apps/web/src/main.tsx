@@ -108,6 +108,8 @@ import "./quiet.css";
 import "./design-system.css";
 import "./market.css";
 import "./rooms.css";
+import "./panels.css";
+import "./collection-surfaces.css";
 import { SettingsMenu, SettingsOverview } from "./SettingsMenu";
 initializePreferences();
 const Market = React.lazy(() =>
@@ -232,7 +234,6 @@ function App() {
   const [walletOpen, setWalletOpen] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
   const [search, setSearch] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [editing, setEditing] = useState(false);
   const [communityDialog, setCommunityDialog] = useState(
     !!new URLSearchParams(location.search).get("invite"),
@@ -580,7 +581,6 @@ function App() {
       setTab("chats");
       setWalletOpen(false);
       setSearch("");
-      setShowSearch(false);
       qc.invalidateQueries({ queryKey: ["chats"] });
     },
     onError: (e) => setError(e.message),
@@ -718,7 +718,6 @@ function App() {
       setMessageSearch("");
       setShowMessageSearch(false);
       setSelected(null);
-      setShowSearch(false);
     }
     setWalletOpen(t === "wallet");
     setTab(t);
@@ -883,45 +882,13 @@ function App() {
       <a className="skip-link" href="#main-content" inert={workspaceBlocked}>
         К содержимому
       </a>
-      <header className="app-topbar" inert={workspaceBlocked}>
-        <button
-          className="topbar-brand"
-          onClick={() => nav("chats")}
-          aria-label="Nimb — на главную"
-        >
-          <Brand />
-        </button>
-        <Nav tab={tab} nav={nav} />
-        <div className="topbar-actions">
-          {me.data.isAdmin && (
-            <button
-              className="icon-button"
-              aria-label="Админ-панель"
-              title="Админ-панель"
-              onClick={() => nav("admin")}
-              aria-current={tab === "admin" ? "page" : undefined}
-            >
-              <Shield size={20} aria-hidden="true" />
-            </button>
-          )}
-          <button
-            className="icon-button"
-            aria-label="Настройки"
-            title="Настройки"
-            onClick={() => nav("settings")}
-          >
-            <Settings size={20} aria-hidden="true" />
-          </button>
-          <button
-            className="topbar-account"
-            aria-label="Мой профиль"
-            title="Мой профиль"
-            onClick={() => nav("profile")}
-          >
-            <Avatar user={user} />
-          </button>
-        </div>
-      </header>
+      <DesktopBar
+        user={user}
+        tab={tab}
+        nav={nav}
+        blocked={workspaceBlocked}
+        isAdmin={!!me.data.isAdmin}
+      />
       <main
         inert={workspaceBlocked}
         id="main-content"
@@ -941,12 +908,17 @@ function App() {
           <section className="conversation-list" aria-label="Список чатов">
             <header className="chats-heading">
               <div>
-                <h1>Сообщения</h1>
-                <span className="count-tag">
-                  {chats.data?.chats.length ?? "…"}
-                </span>
+                <h1>Чаты</h1>
               </div>
               <div className="chats-actions">
+                <button
+                  className="icon-button chat-saved-shortcut"
+                  aria-label="Открыть избранное"
+                  title="Избранное"
+                  onClick={() => nav("saved")}
+                >
+                  <Bookmark size={18} aria-hidden="true" />
+                </button>
                 <button
                   className="icon-button"
                   aria-label="Создать группу или канал"
@@ -959,12 +931,11 @@ function App() {
                   className="icon-button compose-new"
                   aria-label="Найти пользователя"
                   title="Новое сообщение"
-                  onClick={() => {
-                    setShowSearch(true);
-                    document.getElementById("people-search")?.focus();
-                  }}
+                  onClick={() =>
+                    document.getElementById("people-search")?.focus()
+                  }
                 >
-                  <SquarePen size={20} />
+                  <SquarePen size={18} aria-hidden="true" />
                 </button>
               </div>
             </header>
@@ -1524,6 +1495,8 @@ function App() {
                               chatId: selected.id,
                             });
                         }}
+                        name="message"
+                        autoComplete="off"
                         placeholder="Написать сообщение…"
                         aria-label="Сообщение"
                       />
@@ -1552,7 +1525,7 @@ function App() {
                 />
               </>
             ) : messenger ? (
-              <p className="conversation-hint">Выберите чат</p>
+              <p className="conversation-hint">Откройте переписку</p>
             ) : activeTab === "profile" ? (
               ownProfile
             ) : activeTab === "feed" ? (
@@ -1786,14 +1759,130 @@ function App() {
     </div>
   );
 }
+function DesktopBar({
+  user,
+  tab,
+  nav,
+  blocked,
+  isAdmin,
+}: {
+  user: User;
+  tab: string;
+  nav: (tab: string) => void;
+  blocked: boolean;
+  isAdmin: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const disclosure = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function dismiss(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !disclosure.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [open]);
+
+  return (
+    <header className="app-topbar" inert={blocked}>
+      <div
+        className="topbar-disclosure"
+        ref={disclosure}
+        onKeyDown={(event) => {
+          if (open && event.key === "Escape") {
+            event.stopPropagation();
+            setOpen(false);
+            trigger.current?.focus();
+          }
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget))
+            setOpen(false);
+        }}
+      >
+        <button
+          ref={trigger}
+          className="icon-button topbar-menu"
+          aria-label="Меню разделов"
+          aria-expanded={open}
+          aria-controls="desktop-sections"
+          onClick={() => setOpen((value) => !value)}
+        >
+          <Menu size={19} aria-hidden="true" />
+        </button>
+        <Nav
+          tab={tab}
+          hidden={!open}
+          nav={(destination) => {
+            setOpen(false);
+            trigger.current?.focus();
+            nav(destination);
+          }}
+        />
+      </div>
+      <button
+        className="topbar-account"
+        aria-label="Мой профиль"
+        title="Мой профиль"
+        onClick={() => nav("profile")}
+      >
+        <Avatar user={user} />
+        <span className="topbar-user">
+          <strong>
+            <UserName user={user} />
+          </strong>
+          <small>@{user.username}</small>
+        </span>
+      </button>
+      <div className="topbar-actions">
+        {isAdmin && (
+          <button
+            className="icon-button"
+            aria-label="Админ-панель"
+            title="Админ-панель"
+            onClick={() => nav("admin")}
+            aria-current={tab === "admin" ? "page" : undefined}
+          >
+            <Shield size={19} aria-hidden="true" />
+          </button>
+        )}
+        <button
+          className="icon-button"
+          aria-label="Настройки"
+          title="Настройки"
+          onClick={() => nav("settings")}
+        >
+          <Settings size={19} aria-hidden="true" />
+        </button>
+        <button
+          className="topbar-brand"
+          onClick={() => nav("chats")}
+          aria-label="Nimb — на главную"
+        >
+          <Brand markOnly />
+        </button>
+      </div>
+    </header>
+  );
+}
+
 function Nav({
   tab,
   nav,
   mobile = false,
+  hidden = false,
 }: {
   tab: string;
   nav: (t: string) => void;
   mobile?: boolean;
+  hidden?: boolean;
 }) {
   const items = mobile
     ? [
@@ -1804,14 +1893,18 @@ function Nav({
         ["settings", "Настройки", Settings],
       ]
     : [
-        ["chats", "Сообщения", MessagesSquare],
+        ["chats", "Чаты", MessagesSquare],
         ["feed", "Лента", AlignJustify],
         ["market", "Маркет", Store],
         ["wallet", "Кошелёк", WalletIcon],
         ["saved", "Избранное", Bookmark],
       ];
   return (
-    <nav aria-label={mobile ? "Разделы" : "Разделы Nimb"}>
+    <nav
+      id={mobile ? undefined : "desktop-sections"}
+      aria-label={mobile ? "Разделы" : "Разделы Nimb"}
+      hidden={hidden}
+    >
       {items.map(([key, label, Icon]) => (
         <button
           key={key as string}
@@ -1829,7 +1922,7 @@ function Nav({
           title={label as string}
           onClick={() => nav(key as string)}
         >
-          <Icon size={21} />
+          <Icon size={21} aria-hidden="true" />
           <span>{label as string}</span>
         </button>
       ))}
@@ -1895,10 +1988,26 @@ function Profile({
         eyebrow={own ? "ЛИЧНОЕ" : "ПОЛЬЗОВАТЕЛЬ"}
         title={own ? "Мой профиль" : "Профиль"}
         action={
-          <button className="outline compact-button" onClick={share}>
-            <Share2 size={16} />
-            <span>Поделиться</span>
-          </button>
+          <div className="profile-heading-tools">
+            <button
+              className="icon-button"
+              aria-label="Поделиться"
+              title="Поделиться"
+              onClick={share}
+            >
+              <Share2 size={16} aria-hidden="true" />
+            </button>
+            {own && (
+              <button
+                className="icon-button"
+                aria-label="Редактировать"
+                title="Редактировать"
+                onClick={onEdit}
+              >
+                <Pencil size={17} aria-hidden="true" />
+              </button>
+            )}
+          </div>
         }
       />
       <div className="profile-layout">
@@ -1932,40 +2041,31 @@ function Profile({
                       </small>
                     )}
                   </div>
-                  <div className="profile-quick-actions">
-                    {own ? (
-                      <button
-                        className="outline compact-button"
-                        onClick={onEdit}
-                      >
-                        <Pencil size={16} />
-                        <span>Редактировать</span>
+                  {!own && (
+                    <div className="profile-quick-actions">
+                      <button className="primary" onClick={onMessage}>
+                        <MessageCircle size={17} aria-hidden="true" /> Написать
                       </button>
-                    ) : (
-                      <>
-                        <button
-                          className="icon-button"
-                          aria-label="Другие действия"
-                          onClick={() => setActionsOpen(!actionsOpen)}
-                        >
-                          <MoreHorizontal size={20} />
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label="Подарить подарок"
-                          onClick={() => {
-                            setProfileTab("gifts");
-                            setGiftOpen(true);
-                          }}
-                        >
-                          <Gift size={20} />
-                        </button>
-                        <button className="primary" onClick={onMessage}>
-                          <MessageCircle size={17} /> Написать
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      <button
+                        className="outline"
+                        aria-label="Подарить подарок"
+                        onClick={() => {
+                          setProfileTab("gifts");
+                          setGiftOpen(true);
+                        }}
+                      >
+                        <Gift size={17} aria-hidden="true" /> Подарок
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label="Другие действия"
+                        aria-expanded={actionsOpen}
+                        onClick={() => setActionsOpen(!actionsOpen)}
+                      >
+                        <MoreHorizontal size={19} aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {user.bio && <p className="profile-bio">{user.bio}</p>}
                 {user.bioPrivate && !own && (
@@ -1995,6 +2095,10 @@ function Profile({
           )}
           {!own && actionsOpen && <ProfileActions user={user} />}
         </aside>
+        <div className="profile-about">
+          <Collections userId={user.id} own={own} section="badges" />
+          {user.hasMusic && <ProfileMusic user={user} own={own} />}
+        </div>
         <section className="profile-collection">
           <div
             className="profile-tabs"
@@ -2029,6 +2133,11 @@ function Profile({
           </div>
           {profileTab === "posts" && <ProfilePosts user={user} />}
         </section>
+        {own && !user.hasMusic && (
+          <div className="profile-about profile-music-empty">
+            <ProfileMusic user={user} own />
+          </div>
+        )}
         {own && isAdmin && (
           <button className="profile-admin-link" onClick={onAdmin}>
             <Shield size={20} />
@@ -2038,10 +2147,6 @@ function Profile({
             <ArrowUpRight size={18} />
           </button>
         )}
-        <div className="profile-about">
-          <Collections userId={user.id} own={own} section="badges" />
-          <ProfileMusic user={user} own={own} />
-        </div>
       </div>
     </div>
   );

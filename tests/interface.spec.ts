@@ -83,7 +83,7 @@ async function fixture(page: Page, isAdmin = true, secondChat = false) {
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Сообщения", exact: true }),
+    page.getByRole("heading", { name: "Чаты", exact: true }),
   ).toBeVisible();
   return { purchases: () => purchases };
 }
@@ -457,7 +457,7 @@ test("stored navigation is scoped to the account and cannot expose admin", async
   await fixture(page, false);
   await expect(page.locator(".admin-console")).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { name: "Сообщения", exact: true }),
+    page.getByRole("heading", { name: "Чаты", exact: true }),
   ).toBeVisible();
 });
 
@@ -573,6 +573,19 @@ test("desktop settings and profile open above the conversation and return to its
   const composer = page.getByLabel("Сообщение", { exact: true });
   await composer.fill("Черновик");
   const bar = page.locator(".app-topbar");
+  const menu = bar.getByRole("button", { name: "Меню разделов" });
+  const options = bar.getByRole("navigation", { name: "Разделы Nimb" });
+  await menu.focus();
+  await page.keyboard.press("Enter");
+  await expect(options).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(
+    options.getByRole("button", { name: "Чаты", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(options).toBeHidden();
+  await expect(menu).toBeFocused();
+  await expect(composer).toHaveValue("Черновик");
   for (const title of ["Настройки", "Мой профиль"]) {
     const trigger = bar.getByRole("button", { name: title, exact: true });
     await trigger.click();
@@ -617,11 +630,7 @@ test("wallet filters owned names and numbers without changing ownership or activ
       },
     });
   });
-  await openNavigation(page);
-  await page
-    .locator(".app-topbar")
-    .getByRole("button", { name: "Кошелёк", exact: true })
-    .click();
+  await navigate(page, "Кошелёк");
   await expect(page.locator(".wallet-ownership-item")).toHaveCount(2);
   const tabs = page.getByRole("tablist", { name: "Коллекция адресов" });
   await tabs.getByRole("tab", { name: "Номера", exact: true }).click();

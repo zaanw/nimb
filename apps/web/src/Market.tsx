@@ -165,9 +165,10 @@ export function Market({
           <button
             className="market-back"
             aria-label="Назад из маркета"
+            title="К чатам"
             onClick={onBack}
           >
-            <ArrowLeft aria-hidden="true" size={22} />
+            <ArrowLeft aria-hidden="true" size={18} />
           </button>
           <h1>Маркет</h1>
         </div>
@@ -232,7 +233,7 @@ export function Market({
         </div>
         <div className="market-section-head">
           <h2>{tab === "shop" ? "Магазин" : "Коллекционные подарки"}</h2>
-          <label className="market-search">
+          <div className="market-search" role="search">
             <Search aria-hidden="true" size={16} />
             <input
               aria-label="Поиск подарков"
@@ -242,7 +243,7 @@ export function Market({
               autoComplete="off"
               spellCheck={false}
               maxLength={100}
-              placeholder="Поиск подарков…"
+              placeholder="Поиск…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -254,7 +255,7 @@ export function Market({
                 <X aria-hidden="true" size={14} />
               </button>
             )}
-          </label>
+          </div>
         </div>
         {notice && (
           <p className="market-notice" role="status">

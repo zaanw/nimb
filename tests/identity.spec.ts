@@ -83,7 +83,7 @@ async function fixture(page: Page, owner = true, plus = true) {
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Сообщения", exact: true }),
+    page.getByRole("heading", { name: "Чаты", exact: true }),
   ).toBeVisible();
   return changes;
 }
