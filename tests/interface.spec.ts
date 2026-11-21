@@ -96,7 +96,7 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
   await page.locator(".chat-list-item").click();
   await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
   await expect(page.locator(".conversation-list")).toBeVisible();
-  await expect(page.locator(".sidebar")).toBeVisible();
+  await expect(page.locator(".app-topbar")).toBeVisible();
   const layout = await page.evaluate(() => {
     const list = document
       .querySelector(".conversation-list")!
@@ -189,14 +189,14 @@ test("ordinary accounts have no administration entry in navigation, profile or s
   );
   await openNavigation(page);
   await page
-    .locator(".sidebar nav")
+    .locator(".app-topbar")
     .getByRole("button", { name: "Мой профиль", exact: true })
     .click();
   await expect(page.locator(".profile-identity")).toBeVisible();
   await expect(page.locator(".profile-admin-link")).toHaveCount(0);
   await openNavigation(page);
   await page
-    .locator(".side-utilities")
+    .locator(".app-topbar")
     .getByRole("button", { name: "Настройки", exact: true })
     .click();
   await expect(
@@ -212,7 +212,7 @@ test("settings keep desktop navigation and switch to a back button on phones", a
   await fixture(page);
   await openNavigation(page);
   await page
-    .locator(".side-utilities")
+    .locator(".app-topbar")
     .getByRole("button", { name: "Настройки", exact: true })
     .click();
   const menu = page.getByRole("complementary", { name: "Разделы настроек" });
@@ -518,6 +518,11 @@ test("Telegram gift posters fit responsive profile grids and keep their animatio
   await page.evaluate(() => document.fonts.ready);
   for (const width of [320, 390, 820, 1440]) {
     await page.setViewportSize({ width, height: 900 });
+    if (width > 760)
+      await expect(
+        page.getByRole("dialog", { name: "Мой профиль", exact: true }),
+      ).toBeVisible();
+    await expect(page.locator(".gift-tile")).toHaveCount(8);
     const boxes = await page.locator(".gift-tile").evaluateAll((tiles) =>
       tiles.map((tile) => {
         const bounds = tile.getBoundingClientRect();
@@ -537,10 +542,7 @@ test("Telegram gift posters fit responsive profile grids and keep their animatio
       String(width),
     ).toBeTruthy();
     expect(
-      boxes[0].right <= boxes[1].left &&
-        (width > 760 && width <= 1100
-          ? boxes[2].left < boxes[1].left
-          : boxes[1].right <= boxes[2].left),
+      boxes[0].right <= boxes[1].left && boxes[1].right <= boxes[2].left,
       String(width),
     ).toBeTruthy();
     expect(
@@ -562,33 +564,27 @@ test("Telegram gift posters fit responsive profile grids and keep their animatio
   await expect(page.locator(".gift-animation")).toHaveCount(0);
 });
 
-test("desktop navigation keeps its width choice and the open conversation", async ({
+test("desktop settings and profile open above the conversation and return to its draft", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 950 });
   await fixture(page);
   await page.locator(".chat-list-item").click();
-  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "Свернуть меню", exact: true })
-    .click();
-  await expect(
-    page.locator(".sidebar nav").getByText("Сообщения", { exact: true }),
-  ).toBeHidden();
-  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "Развернуть меню", exact: true })
-    .click();
-  await expect(
-    page.locator(".sidebar nav").getByText("Сообщения", { exact: true }),
-  ).toBeVisible();
-  await navigate(page, "Кошелёк");
-  await expect(
-    page.getByRole("button", { name: "Свернуть меню", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
-  await navigate(page, "Сообщения");
-  await page.locator(".chat-list-item").click();
-  await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
+  const composer = page.getByLabel("Сообщение", { exact: true });
+  await composer.fill("Черновик");
+  const bar = page.locator(".app-topbar");
+  for (const title of ["Настройки", "Мой профиль"]) {
+    const trigger = bar.getByRole("button", { name: title, exact: true });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: title, exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeFocused();
+    await expect(page.locator("main.main")).toHaveAttribute("inert", "");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(composer).toHaveValue("Черновик");
+    await expect(trigger).toBeFocused();
+  }
 });
 
 test("wallet filters owned names and numbers without changing ownership or active addresses", async ({
@@ -623,7 +619,7 @@ test("wallet filters owned names and numbers without changing ownership or activ
   });
   await openNavigation(page);
   await page
-    .locator(".sidebar nav")
+    .locator(".app-topbar")
     .getByRole("button", { name: "Кошелёк", exact: true })
     .click();
   await expect(page.locator(".wallet-ownership-item")).toHaveCount(2);

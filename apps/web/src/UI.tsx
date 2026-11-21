@@ -55,11 +55,13 @@ export function Dialog({
   children,
   onClose,
   className = "",
+  showTitle = true,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   className?: string;
+  showTitle?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -76,10 +78,15 @@ export function Dialog({
         closeRef.current();
       }
       if (e.key === "Tab") {
-        const focusable = node?.querySelectorAll<HTMLElement>(
-          'a[href],button:not(:disabled),input:not(:disabled):not([type="hidden"]),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
+        const focusable = Array.from(
+          node?.querySelectorAll<HTMLElement>(
+            'a[href],button:not(:disabled),input:not(:disabled):not([type="hidden"]),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
+          ) ?? [],
+        ).filter(
+          (element) =>
+            element.getClientRects().length > 0 && !element.closest("[inert]"),
         );
-        if (!focusable?.length) return;
+        if (!focusable.length) return;
         const first = focusable[0],
           last = focusable[focusable.length - 1];
         if (
@@ -121,7 +128,7 @@ export function Dialog({
         >
           <X size={20} />
         </button>
-        <h2>{title}</h2>
+        {showTitle && <h2>{title}</h2>}
         {children}
       </div>
     </div>,

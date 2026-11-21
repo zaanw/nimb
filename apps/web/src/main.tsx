@@ -1,4 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   QueryClient,
@@ -54,11 +59,9 @@ import {
   Smartphone,
   Wallet as WalletIcon,
   Hash,
-  AtSign,
   Bookmark,
   Archive,
   Pin,
-  PanelLeft,
   ArrowUpRight,
 } from "lucide-react";
 import "./style.css";
@@ -104,6 +107,7 @@ import "./theme.css";
 import "./quiet.css";
 import "./design-system.css";
 import "./market.css";
+import "./rooms.css";
 import { SettingsMenu, SettingsOverview } from "./SettingsMenu";
 initializePreferences();
 const Market = React.lazy(() =>
@@ -194,6 +198,17 @@ function ChatAvatar({ chat, user }: { chat: Chat; user: User }) {
     </div>
   );
 }
+const desktopViewport = window.matchMedia("(min-width: 761px)");
+
+function subscribeDesktop(onChange: () => void) {
+  desktopViewport.addEventListener("change", onChange);
+  return () => desktopViewport.removeEventListener("change", onChange);
+}
+
+function isDesktop() {
+  return desktopViewport.matches;
+}
+
 function App() {
   const qc = useQueryClient();
   const installApp = useInstallApp();
@@ -209,27 +224,10 @@ function App() {
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   });
   const [tab, setTab] = useState("chats");
-  const [navigationExpanded, setNavigationExpanded] = useState(
-    () => window.innerWidth > 1100,
-  );
-  useEffect(() => {
-    if (!navigationExpanded) return;
-    const close = (event: KeyboardEvent) => {
-      if (
-        event.key === "Escape" &&
-        !document.querySelector('[role="dialog"]') &&
-        (document.querySelector(".sidebar")?.contains(document.activeElement) ||
-          document.activeElement?.classList.contains("navigation-toggle"))
-      ) {
-        setNavigationExpanded(false);
-        document
-          .querySelector<HTMLButtonElement>(".navigation-toggle")
-          ?.focus();
-      }
-    };
-    document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
-  }, [navigationExpanded]);
+  const desktop = useSyncExternalStore(subscribeDesktop, isDesktop);
+  const [workspaceTab, setWorkspaceTab] = useState("chats");
+  const workspaceTrigger = useRef<HTMLElement | null>(null);
+  const profileTrigger = useRef<HTMLElement | null>(null);
   const [selected, setSelected] = useState<Chat | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
@@ -580,6 +578,7 @@ function App() {
       setSelected(chat);
       setProfile(null);
       setTab("chats");
+      setWalletOpen(false);
       setSearch("");
       setShowSearch(false);
       qc.invalidateQueries({ queryKey: ["chats"] });
@@ -641,7 +640,7 @@ function App() {
         }),
       );
       setEditing(false);
-      setProfile(user);
+      setProfile((current) => (current?.id === user.id ? user : current));
     },
     onError: (e) => setError(e.message),
   });
@@ -694,28 +693,49 @@ function App() {
             createdAt: new Date().toISOString(),
           }
         : undefined;
-  function nav(t: string) {
+  const accountPanel = desktop && (tab === "profile" || tab === "settings");
+  const activeTab = accountPanel ? workspaceTab : tab;
+  const profilePanel = desktop || selected ? profile : null;
+  const workspaceBlocked = !!(accountPanel || profilePanel);
+
+  function nav(t: string, keepWorkspace = false) {
+    const openingPanel = desktop && (t === "profile" || t === "settings");
+    if (openingPanel && !accountPanel) {
+      workspaceTrigger.current = document.activeElement as HTMLElement | null;
+      setWorkspaceTab(tab);
+    }
     const url = new URL(location.href);
     url.searchParams.set("tab", t);
     for (const key of ["user", "invite", "chat"]) url.searchParams.delete(key);
-    if (t !== "market")
+    if (t !== "market" && !openingPanel)
       for (const key of ["market-view", "market-search"])
         url.searchParams.delete(key);
     history.replaceState(null, "", url);
-    window.scrollTo(0, 0);
-    if (mainRef.current) mainRef.current.scrollTop = 0;
+    if (!openingPanel && !keepWorkspace) {
+      if (mainRef.current) mainRef.current.scrollTop = 0;
+      setSearch("");
+      setReplyTo(null);
+      setMessageSearch("");
+      setShowMessageSearch(false);
+      setSelected(null);
+      setShowSearch(false);
+    }
     setWalletOpen(t === "wallet");
-    setSearch("");
-    setReplyTo(null);
-    setMessageSearch("");
-    setShowMessageSearch(false);
     setTab(t);
-    setSelected(null);
     setProfile(null);
     setSetting("");
-    setShowSearch(false);
     setError("");
   }
+  function showProfile(user: User) {
+    profileTrigger.current = document.activeElement as HTMLElement | null;
+    setProfile(user);
+  }
+
+  function closeProfile() {
+    setProfile(null);
+    requestAnimationFrame(() => profileTrigger.current?.focus());
+  }
+
   const searchTerm = search.trim().replace(/^@/, "").toLocaleLowerCase();
   const matchingChats = searchTerm
     ? (chats.data?.chats || []).filter((chat) => {
@@ -731,29 +751,139 @@ function App() {
           .includes(searchTerm);
       })
     : [];
-  const messenger = tab === "chats" && !walletOpen;
+  const ownProfile = (
+    <Profile
+      user={user}
+      own
+      isAdmin={me.data.isAdmin}
+      onAdmin={() => nav("admin")}
+      onMessage={() => {}}
+      onEdit={() => setEditing(true)}
+    />
+  );
+  const settingsContent = (
+    <div className={"settings-screen " + (setting ? "has-section" : "")}>
+      <header className="settings-heading">
+        <PageHeading title="Настройки" />
+      </header>
+      <div className="settings-layout">
+        <SettingsMenu
+          avatar={<Avatar user={user} />}
+          name={<UserName user={user} />}
+          username={user.username}
+          selected={setting}
+          search={settingsSearch}
+          onSearch={setSettingsSearch}
+          onSelect={setSetting}
+          onProfile={() => nav("profile")}
+          onLogout={async () => {
+            await api("/logout", send("POST", {}));
+            clearPushPreference();
+            qc.clear();
+            location.reload();
+          }}
+        />
+        <section className="settings-content" aria-label="Содержимое настроек">
+          {setting ? (
+            <>
+              <button className="back-link" onClick={() => setSetting("")}>
+                <ArrowLeft size={18} /> Все настройки
+              </button>
+              {setting === "Установить приложение" ? (
+                <InstallApp {...installApp} />
+              ) : setting === "Администрирование" ? (
+                <Admin owner={user.id === 1} />
+              ) : setting === "nimb Plus" ? (
+                <IdentitySettings key={`${user.id}-${user.plus}`} user={user} />
+              ) : setting === "Аккаунт" ? (
+                <AccountSettings
+                  edit={() => {
+                    nav("profile");
+                    setEditing(true);
+                  }}
+                />
+              ) : setting === "Хранилище" ? (
+                <StorageSettings />
+              ) : setting === "О приложении" ? (
+                <AboutSettings />
+              ) : setting === "Язык" ? (
+                <LanguageSettings />
+              ) : setting === "Папки с чатами" ? (
+                <FolderSettings
+                  chats={chats.data?.chats || []}
+                  userId={user.id}
+                />
+              ) : setting === "Уведомления" ? (
+                <NotificationSettings />
+              ) : ["Шрифты", "Оформление", "Производительность"].includes(
+                  setting,
+                ) ? (
+                <Preferences section={setting} />
+              ) : setting === "Конфиденциальность" ? (
+                <PrivacySettings
+                  user={user}
+                  onUpdate={(u) =>
+                    qc.setQueryData(
+                      ["me"],
+                      (old: { user: User; isAdmin?: boolean } | undefined) => ({
+                        ...old,
+                        user: u,
+                      }),
+                    )
+                  }
+                />
+              ) : ["Безопасность", "Устройства"].includes(setting) ? (
+                <SecuritySettings section={setting} />
+              ) : (
+                <div className="setting-detail">
+                  <h2>{setting}</h2>
+                  <p>В разработке</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <SettingsOverview
+                avatar={<Avatar user={user} size="large" />}
+                name={<UserName user={user} />}
+                username={user.username}
+                onSelect={setSetting}
+              />
+              {me.data?.isAdmin && (
+                <button className="admin-entry" onClick={() => nav("admin")}>
+                  <span className="admin-entry-icon">
+                    <Shield size={20} />
+                  </span>
+                  <span>
+                    <strong>Панель администратора</strong>
+                    <small>Пользователи, подарки и жалобы</small>
+                  </span>
+                  <ChevronRight size={19} />
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+  const showingWallet = activeTab === "wallet" || (!accountPanel && walletOpen);
+  const messenger = activeTab === "chats" && !showingWallet;
   return (
     <div
       className={
         "shell " +
-        (tab === "market" ? "market-open " : "") +
-        (navigationExpanded ? "navigation-expanded " : "") +
+        (activeTab === "market" ? "market-open " : "") +
         (messenger ? "messenger-shell" : "") +
-        (messenger && (selected || profile) ? " conversation-open" : "")
+        (messenger && (selected || (!profilePanel && profile))
+          ? " conversation-open"
+          : "")
       }
     >
-      <a className="skip-link" href="#main-content">
+      <a className="skip-link" href="#main-content" inert={workspaceBlocked}>
         К содержимому
       </a>
-      <header className="app-topbar">
-        <button
-          className="icon-button navigation-toggle"
-          aria-label={navigationExpanded ? "Свернуть меню" : "Развернуть меню"}
-          aria-expanded={navigationExpanded}
-          onClick={() => setNavigationExpanded((value) => !value)}
-        >
-          <PanelLeft size={20} aria-hidden="true" />
-        </button>
+      <header className="app-topbar" inert={workspaceBlocked}>
         <button
           className="topbar-brand"
           onClick={() => nav("chats")}
@@ -761,66 +891,39 @@ function App() {
         >
           <Brand />
         </button>
-        <div className="topbar-actions">
-          <button
-            className="outline topbar-create"
-            onClick={() => setCommunityDialog(true)}
-          >
-            <Plus size={16} aria-hidden="true" />
-            Создать
-          </button>
-          <button
-            className="icon-button topbar-settings"
-            aria-label="Открыть настройки"
-            title="Настройки"
-            onClick={() => nav("settings")}
-          >
-            <Settings size={19} aria-hidden="true" />
-          </button>
-          <button
-            className="topbar-account"
-            aria-label="Открыть мой профиль"
-            onClick={() => nav("profile")}
-          >
-            <Avatar user={user} />
-            <span>
-              <strong>
-                <UserName user={user} />
-              </strong>
-              <small>@{user.username}</small>
-            </span>
-          </button>
-        </div>
-      </header>
-      <aside className="sidebar" aria-label="Основная навигация">
-        <span className="side-label">Общение</span>
         <Nav tab={tab} nav={nav} />
-        <div className="side-utilities">
-          <span className="side-label">Пространство</span>
+        <div className="topbar-actions">
+          {me.data.isAdmin && (
+            <button
+              className="icon-button"
+              aria-label="Админ-панель"
+              title="Админ-панель"
+              onClick={() => nav("admin")}
+              aria-current={tab === "admin" ? "page" : undefined}
+            >
+              <Shield size={20} aria-hidden="true" />
+            </button>
+          )}
           <button
-            className={tab === "settings" ? "active" : ""}
+            className="icon-button"
             aria-label="Настройки"
             title="Настройки"
             onClick={() => nav("settings")}
           >
-            <Settings size={20} />
-            <span>Настройки</span>
+            <Settings size={20} aria-hidden="true" />
           </button>
-          {me.data.isAdmin && (
-            <button
-              className={tab === "admin" ? "active" : ""}
-              aria-label="Админ-панель"
-              title="Админ-панель"
-              onClick={() => nav("admin")}
-            >
-              <Shield size={20} />
-              <span>Админ-панель</span>
-              <span className="owner-tag">ADMIN</span>
-            </button>
-          )}
+          <button
+            className="topbar-account"
+            aria-label="Мой профиль"
+            title="Мой профиль"
+            onClick={() => nav("profile")}
+          >
+            <Avatar user={user} />
+          </button>
         </div>
-      </aside>
+      </header>
       <main
+        inert={workspaceBlocked}
         id="main-content"
         tabIndex={-1}
         ref={mainRef}
@@ -828,7 +931,7 @@ function App() {
           "main " +
           (messenger
             ? "chat-workspace"
-            : walletOpen
+            : showingWallet
               ? "wallet-workspace"
               : "page-workspace") +
           (selected ? " has-chat" : "")
@@ -843,25 +946,39 @@ function App() {
                   {chats.data?.chats.length ?? "…"}
                 </span>
               </div>
-              <button
-                className="icon-button compose-new"
-                aria-label="Найти пользователя"
-                title="Новое сообщение"
-                onClick={() => {
-                  setShowSearch(true);
-                  document.getElementById("people-search")?.focus();
-                }}
-              >
-                <SquarePen size={20} />
-              </button>
+              <div className="chats-actions">
+                <button
+                  className="icon-button"
+                  aria-label="Создать группу или канал"
+                  title="Создать группу или канал"
+                  onClick={() => setCommunityDialog(true)}
+                >
+                  <Users size={19} aria-hidden="true" />
+                </button>
+                <button
+                  className="icon-button compose-new"
+                  aria-label="Найти пользователя"
+                  title="Новое сообщение"
+                  onClick={() => {
+                    setShowSearch(true);
+                    document.getElementById("people-search")?.focus();
+                  }}
+                >
+                  <SquarePen size={20} />
+                </button>
+              </div>
             </header>
             <div className="search-box chats-search">
               <Search size={17} />
               <input
                 id="people-search"
                 maxLength={100}
-                placeholder="Поиск людей и чатов"
+                name="people-search"
+                type="search"
+                autoComplete="off"
+                placeholder="Поиск"
                 aria-label="Поиск людей и чатов"
+                spellCheck={false}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -874,7 +991,10 @@ function App() {
                 </button>
               )}
             </div>
-            <div className="chat-list-tabs">
+            <div
+              className="chat-list-tabs"
+              hidden={!folders.data?.folders.length}
+            >
               <button
                 className={!activeFolder ? "active" : ""}
                 onClick={() => setActiveFolder(null)}
@@ -890,14 +1010,6 @@ function App() {
                   {folder.name}
                 </button>
               ))}
-              <button
-                className="new-group-button"
-                title="Создать группу или канал"
-                aria-label="Создать группу или канал"
-                onClick={() => setCommunityDialog(true)}
-              >
-                <Plus size={17} />
-              </button>
             </div>
             <div className="chat-filters" aria-label="Фильтр переписок">
               {[
@@ -980,7 +1092,7 @@ function App() {
                         key={u.id}
                         onClick={() => {
                           setSelected(null);
-                          setProfile(u);
+                          showProfile(u);
                         }}
                       >
                         <Avatar user={u} />
@@ -1001,36 +1113,31 @@ function App() {
                 </>
               ) : (
                 <>
-                  <button
-                    className="wallet-chat list-item"
-                    onClick={() => nav("wallet")}
-                  >
-                    <span className="wallet-chat-avatar">
-                      <WalletIcon size={21} />
-                    </span>
-                    <span className="item-copy">
-                      <strong>
-                        Кошелёк Nimb <span className="bot-tag">БОТ</span>
-                      </strong>
-                      <small>Нимбики и ваши юзернеймы</small>
-                    </span>
-                    <ChevronRight size={15} />
-                  </button>
-                  <button
-                    className="saved-chat list-item"
-                    onClick={() => nav("saved")}
-                  >
-                    <span className="saved-chat-avatar">
-                      <Bookmark size={20} />
-                    </span>
-                    <span className="item-copy">
-                      <strong>Избранное</strong>
-                      <small>Сохранённые сообщения</small>
-                    </span>
-                    <ChevronRight size={15} />
-                  </button>
-                  <div className="list-section-label">
-                    ПЕРЕПИСКИ <span>{visibleChats.length}</span>
+                  <div className="chat-shortcuts">
+                    <button
+                      className="wallet-chat list-item"
+                      onClick={() => nav("wallet")}
+                    >
+                      <span className="wallet-chat-avatar">
+                        <WalletIcon size={21} />
+                      </span>
+                      <span className="item-copy">
+                        <strong>Кошелёк</strong>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
+                    <button
+                      className="saved-chat list-item"
+                      onClick={() => nav("saved")}
+                    >
+                      <span className="saved-chat-avatar">
+                        <Bookmark size={20} />
+                      </span>
+                      <span className="item-copy">
+                        <strong>Избранное</strong>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
                   </div>
                   {chats.isLoading ? (
                     <p className="muted list-feedback">Загружаем чаты…</p>
@@ -1159,35 +1266,23 @@ function App() {
                 </>
               )}
             </div>
-            <button
-              className="create-community"
-              onClick={() => setCommunityDialog(true)}
-            >
-              <Users size={18} />
-              <span>Создать группу или канал</span>
-              <Plus size={16} />
-            </button>
           </section>
         )}
         <AnimatePresence mode="wait">
           <motion.div
             key={
-              walletOpen
-                ? "wallet"
-                : selected
-                  ? "conversation"
-                  : profile
-                    ? "profile" + profile.id
-                    : setting
-                      ? "setting" + setting
-                      : tab
+              messenger && selected
+                ? "conversation"
+                : messenger && profile && !profilePanel
+                  ? "profile" + profile.id
+                  : activeTab
             }
             className={
               "screen " +
               (messenger
                 ? selected
                   ? "conversation-screen"
-                  : profile
+                  : profile && !profilePanel
                     ? "chat-profile-screen"
                     : "conversation-placeholder"
                 : "content-screen")
@@ -1197,7 +1292,7 @@ function App() {
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.18 }}
           >
-            {tab === "market" ? (
+            {activeTab === "market" ? (
               <React.Suspense
                 fallback={
                   <p role="status" className="page-loading">
@@ -1210,9 +1305,9 @@ function App() {
                   onWallet={() => nav("wallet")}
                 />
               </React.Suspense>
-            ) : walletOpen ? (
+            ) : showingWallet ? (
               <Wallet onBack={() => nav("chats")} />
-            ) : tab === "saved" ? (
+            ) : activeTab === "saved" ? (
               <SavedMessages
                 openChat={(id) => {
                   const chat = chats.data?.chats.find((c) => c.id === id);
@@ -1222,7 +1317,7 @@ function App() {
                   } else setError("Переписка недоступна");
                 }}
               />
-            ) : selected && other ? (
+            ) : messenger && selected && other ? (
               <>
                 <header className="chat-header">
                   <button
@@ -1236,7 +1331,7 @@ function App() {
                     className="person-button"
                     onClick={() =>
                       currentChat?.kind === "direct"
-                        ? setProfile(other)
+                        ? showProfile(other)
                         : setCommunityInfo(true)
                     }
                   >
@@ -1274,20 +1369,6 @@ function App() {
                     <MoreHorizontal size={20} />
                   </button>
                 </header>
-                {profile && (
-                  <Dialog
-                    title={profile.name}
-                    className="profile-dialog"
-                    onClose={() => setProfile(null)}
-                  >
-                    <Profile
-                      user={profile}
-                      own={false}
-                      onMessage={() => setProfile(null)}
-                      onEdit={() => {}}
-                    />
-                  </Dialog>
-                )}
                 {typingChat === selected.id && (
                   <div className="typing-indicator">Печатает…</div>
                 )}
@@ -1443,7 +1524,7 @@ function App() {
                               chatId: selected.id,
                             });
                         }}
-                        placeholder="Написать сообщение..."
+                        placeholder="Написать сообщение…"
                         aria-label="Сообщение"
                       />
                       <button
@@ -1456,7 +1537,7 @@ function App() {
                   </div>
                 )}
               </>
-            ) : profile ? (
+            ) : messenger && profile && !profilePanel ? (
               <>
                 <button className="back-link" onClick={() => setProfile(null)}>
                   <ArrowLeft size={18} /> Назад
@@ -1470,178 +1551,16 @@ function App() {
                   onEdit={() => setEditing(true)}
                 />
               </>
-            ) : tab === "chats" ? (
-              <div className="conversation-welcome">
-                <div className="welcome-symbol">
-                  <MessagesSquare size={40} strokeWidth={1.25} />
-                </div>
-                <span className="eyebrow">NIMB MESSENGER</span>
-                <h1>
-                  Всё начинается
-                  <br />с «привет».
-                </h1>
-                <p>
-                  Откройте переписку слева
-                  <br />
-                  или найдите человека по @юзернейму.
-                </p>
-                <button
-                  className="primary"
-                  onClick={() => {
-                    setShowSearch(true);
-                    requestAnimationFrame(() =>
-                      document.getElementById("people-search")?.focus(),
-                    );
-                  }}
-                >
-                  <SquarePen size={18} /> Новое сообщение
-                </button>
-                <div className="welcome-footnote">
-                  <AtSign size={15} /> Для общения достаточно имени пользователя
-                </div>
-              </div>
-            ) : tab === "profile" ? (
-              <Profile
-                user={user}
-                own
-                isAdmin={me.data.isAdmin}
-                onAdmin={() => nav("admin")}
-                onMessage={() => {}}
-                onEdit={() => setEditing(true)}
-              />
-            ) : tab === "feed" ? (
-              <Feed me={user} onOpen={setProfile} onNavigate={nav} />
-            ) : tab === "admin" && me.data.isAdmin ? (
+            ) : messenger ? (
+              <p className="conversation-hint">Выберите чат</p>
+            ) : activeTab === "profile" ? (
+              ownProfile
+            ) : activeTab === "feed" ? (
+              <Feed me={user} onOpen={showProfile} onNavigate={nav} />
+            ) : activeTab === "admin" && me.data.isAdmin ? (
               <Admin owner={user.id === 1} />
             ) : (
-              <>
-                <div
-                  className={
-                    "settings-screen " + (setting ? "has-section" : "")
-                  }
-                >
-                  <header className="settings-heading">
-                    <PageHeading title="Настройки" />
-                  </header>
-                  <div className="settings-layout">
-                    <SettingsMenu
-                      avatar={<Avatar user={user} />}
-                      name={<UserName user={user} />}
-                      username={user.username}
-                      selected={setting}
-                      search={settingsSearch}
-                      onSearch={setSettingsSearch}
-                      onSelect={setSetting}
-                      onProfile={() => nav("profile")}
-                      onLogout={async () => {
-                        await api("/logout", send("POST", {}));
-                        clearPushPreference();
-                        qc.clear();
-                        location.reload();
-                      }}
-                    />
-                    <section
-                      className="settings-content"
-                      aria-label="Содержимое настроек"
-                    >
-                      {setting ? (
-                        <>
-                          <button
-                            className="back-link"
-                            onClick={() => setSetting("")}
-                          >
-                            <ArrowLeft size={18} /> Все настройки
-                          </button>
-                          {setting === "Установить приложение" ? (
-                            <InstallApp {...installApp} />
-                          ) : setting === "Администрирование" ? (
-                            <Admin owner={user.id === 1} />
-                          ) : setting === "nimb Plus" ? (
-                            <IdentitySettings
-                              key={`${user.id}-${user.plus}`}
-                              user={user}
-                            />
-                          ) : setting === "Аккаунт" ? (
-                            <AccountSettings
-                              edit={() => {
-                                setSetting("");
-                                setTab("profile");
-                                setEditing(true);
-                              }}
-                            />
-                          ) : setting === "Хранилище" ? (
-                            <StorageSettings />
-                          ) : setting === "О приложении" ? (
-                            <AboutSettings />
-                          ) : setting === "Язык" ? (
-                            <LanguageSettings />
-                          ) : setting === "Папки с чатами" ? (
-                            <FolderSettings
-                              chats={chats.data?.chats || []}
-                              userId={user.id}
-                            />
-                          ) : setting === "Уведомления" ? (
-                            <NotificationSettings />
-                          ) : [
-                              "Шрифты",
-                              "Оформление",
-                              "Производительность",
-                            ].includes(setting) ? (
-                            <Preferences section={setting} />
-                          ) : setting === "Конфиденциальность" ? (
-                            <PrivacySettings
-                              user={user}
-                              onUpdate={(u) =>
-                                qc.setQueryData(
-                                  ["me"],
-                                  (
-                                    old:
-                                      | { user: User; isAdmin?: boolean }
-                                      | undefined,
-                                  ) => ({ ...old, user: u }),
-                                )
-                              }
-                            />
-                          ) : ["Безопасность", "Устройства"].includes(
-                              setting,
-                            ) ? (
-                            <SecuritySettings section={setting} />
-                          ) : (
-                            <div className="setting-detail">
-                              <h2>{setting}</h2>
-                              <p>В разработке</p>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <SettingsOverview
-                            avatar={<Avatar user={user} size="large" />}
-                            name={<UserName user={user} />}
-                            username={user.username}
-                            onSelect={setSetting}
-                          />
-                          {me.data?.isAdmin && (
-                            <button
-                              className="admin-entry"
-                              onClick={() => nav("admin")}
-                            >
-                              <span className="admin-entry-icon">
-                                <Shield size={20} />
-                              </span>
-                              <span>
-                                <strong>Панель администратора</strong>
-                                <small>Пользователи, подарки и жалобы</small>
-                              </span>
-                              <ChevronRight size={19} />
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </section>
-                  </div>
-                </div>
-              </>
+              settingsContent
             )}
           </motion.div>
         </AnimatePresence>
@@ -1654,9 +1573,46 @@ function App() {
           </div>
         )}
       </main>
-      <div className="mobile-nav">
+      <div className="mobile-nav" inert={!!profilePanel}>
         <Nav tab={tab} nav={nav} mobile />
       </div>
+      {accountPanel && (
+        <Dialog
+          key={tab}
+          title={tab === "profile" ? "Мой профиль" : "Настройки"}
+          className={
+            tab === "profile"
+              ? "profile-dialog workspace-dialog"
+              : "settings-dialog workspace-dialog"
+          }
+          showTitle={false}
+          onClose={() => {
+            nav(workspaceTab, true);
+            requestAnimationFrame(() => workspaceTrigger.current?.focus());
+          }}
+        >
+          {tab === "profile" ? ownProfile : settingsContent}
+        </Dialog>
+      )}
+      {profilePanel && !accountPanel && (
+        <Dialog
+          title={profilePanel.name}
+          className="profile-dialog workspace-dialog"
+          showTitle={false}
+          onClose={closeProfile}
+        >
+          <Profile
+            user={profilePanel}
+            own={profilePanel.id === user.id}
+            isAdmin={profilePanel.id === user.id && me.data.isAdmin}
+            onAdmin={() => nav("admin")}
+            onMessage={() =>
+              selected ? closeProfile() : openChat.mutate(profilePanel.id)
+            }
+            onEdit={() => setEditing(true)}
+          />
+        </Dialog>
+      )}
       {forwardMessage && (
         <Dialog
           title="Выберите чат"
@@ -1762,7 +1718,7 @@ function App() {
                   user: u,
                 }),
               );
-              setProfile(u);
+              setProfile((current) => (current?.id === u.id ? u : current));
               qc.invalidateQueries({ queryKey: ["chats"] });
               qc.invalidateQueries({ queryKey: ["users"] });
             }}
@@ -1777,7 +1733,7 @@ function App() {
                   user: u,
                 }),
               );
-              setProfile(u);
+              setProfile((current) => (current?.id === u.id ? u : current));
             }}
           />
           <LinksEditor
@@ -1790,7 +1746,7 @@ function App() {
                   user: u,
                 }),
               );
-              setProfile(u);
+              setProfile((current) => (current?.id === u.id ? u : current));
             }}
           />
           <form
@@ -1853,7 +1809,6 @@ function Nav({
         ["market", "Маркет", Store],
         ["wallet", "Кошелёк", WalletIcon],
         ["saved", "Избранное", Bookmark],
-        ["profile", "Мой профиль", CircleUserRound],
       ];
   return (
     <nav aria-label={mobile ? "Разделы" : "Разделы Nimb"}>
@@ -1961,14 +1916,7 @@ function Profile({
                     }
                   : undefined
               }
-            >
-              {!user.hasBanner && (
-                <>
-                  <span className="profile-cover-word">nimb</span>
-                  <span className="profile-cover-caption">МЕСТО ДЛЯ СВОИХ</span>
-                </>
-              )}
-            </div>
+            />
             <div className="profile-overview">
               <div className="profile-hero">
                 <div className="profile-identity">
@@ -2046,20 +1994,6 @@ function Profile({
             </p>
           )}
           {!own && actionsOpen && <ProfileActions user={user} />}
-          {own && isAdmin && (
-            <button className="profile-admin-link" onClick={onAdmin}>
-              <Shield size={20} />
-              <span>
-                <strong>Админ-панель</strong>
-                <small>Пользователи, нимбики и подарки</small>
-              </span>
-              <ArrowUpRight size={18} />
-            </button>
-          )}
-          <div className="profile-about">
-            <Collections userId={user.id} own={own} section="badges" />
-            <ProfileMusic user={user} own={own} />
-          </div>
         </aside>
         <section className="profile-collection">
           <div
@@ -2095,6 +2029,19 @@ function Profile({
           </div>
           {profileTab === "posts" && <ProfilePosts user={user} />}
         </section>
+        {own && isAdmin && (
+          <button className="profile-admin-link" onClick={onAdmin}>
+            <Shield size={20} />
+            <span>
+              <strong>Админ-панель</strong>
+            </span>
+            <ArrowUpRight size={18} />
+          </button>
+        )}
+        <div className="profile-about">
+          <Collections userId={user.id} own={own} section="badges" />
+          <ProfileMusic user={user} own={own} />
+        </div>
       </div>
     </div>
   );

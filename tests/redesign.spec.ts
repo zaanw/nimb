@@ -3,7 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { redesignFixture } from "./fixtures/redesign";
 import { navigate } from "./navigation";
 
-const evidence = "/workspace/nimb-redesign-evidence-20261120";
+const evidence =
+  process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-rooms-evidence";
 test("all primary screens fit the four release widths, with screenshots and keyboard/motion checks", async ({
   page,
 }) => {
@@ -15,15 +16,6 @@ test("all primary screens fit the four release widths, with screenshots and keyb
   const measurements: unknown[] = [];
   for (const width of [375, 768, 1280, 1920]) {
     await page.setViewportSize({ width, height: 900 });
-    if (
-      width > 1100 &&
-      (await page
-        .getByRole("button", { name: "Развернуть меню", exact: true })
-        .isVisible())
-    )
-      await page
-        .getByRole("button", { name: "Развернуть меню", exact: true })
-        .click();
     const directory = `${evidence}/after/${width}`;
     await mkdir(directory, { recursive: true });
     async function capture(screen: string) {
@@ -65,6 +57,8 @@ test("all primary screens fit the four release widths, with screenshots and keyb
       await page.screenshot({ path: `${directory}/${screen}.png` });
     }
     await navigate(page, width <= 760 ? "Чаты" : "Сообщения");
+    await expect(page.locator(".conversation-placeholder")).toBeAttached();
+    await capture("chat-list");
     await page.locator(".chat-list-item").click();
     await expect(page.getByLabel("Сообщение", { exact: true })).toBeVisible();
     expect(
@@ -102,11 +96,17 @@ test("all primary screens fit the four release widths, with screenshots and keyb
         await expect(
           page.getByRole("button", { name: "Редактировать", exact: true }),
         ).toBeVisible();
-        if (width === 768) {
-          const collection = await page
-            .locator(".profile-collection")
-            .boundingBox();
-          expect(collection!.y).toBeLessThan(300);
+        if (width > 760) {
+          const dialog = page.getByRole("dialog", {
+            name: heading,
+            exact: true,
+          });
+          await expect(dialog).toBeVisible();
+          expect(
+            await dialog.evaluate(
+              (element) => element.scrollWidth <= element.clientWidth + 1,
+            ),
+          ).toBe(true);
         }
       }
       await capture(file);
@@ -218,6 +218,7 @@ test("keyboard skip link and text contrast are usable on the main application su
   await expect(
     page.getByRole("link", { name: "К содержимому", exact: true }),
   ).toBeInViewport();
+  await mkdir(evidence, { recursive: true });
   const ratios = await page
     .locator(".market-item-meta")
     .first()
@@ -287,6 +288,7 @@ test("login and registration remain readable at every release width", async ({
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    await mkdir(`${evidence}/after/${width}`, { recursive: true });
     await page.screenshot({ path: `${evidence}/after/${width}/login.png` });
     await page
       .getByRole("button", { name: "Создать аккаунт", exact: true })

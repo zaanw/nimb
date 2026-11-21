@@ -109,7 +109,6 @@ export function Auth() {
     <main className="auth">
       <header className="auth-top">
         <Brand />
-        <span>МЕСТО ДЛЯ СВОИХ</span>
       </header>
       <div className="auth-grid">
         <section className="auth-card">
@@ -218,7 +217,6 @@ export function Auth() {
       </div>
       <div className="auth-footer">
         <span>© nimb</span>
-        <span>Ближе друг к другу</span>
       </div>
     </main>
   );

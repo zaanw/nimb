@@ -694,12 +694,7 @@ export function Admin({ owner = false }: { owner?: boolean }) {
     <section className="admin-console">
       <header className="control-heading">
         <div className="control-heading-copy">
-          <div className="control-breadcrumb">
-            <Shield size={13} />
-            NIMB<span>/</span>УПРАВЛЕНИЕ
-          </div>
           <h1>Админ-панель</h1>
-          <p>Люди, награды и всё, что происходит в nimb.</p>
         </div>
         <button
           className="control-button"
