@@ -114,9 +114,19 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
       buffer: image,
     });
     await expect(b.getByAltText("pepe.webp", { exact: true })).toBeVisible();
+    const chatDetails = a.getByRole("complementary", {
+      name: "Сведения о чате",
+    });
+    const attachedFile = chatDetails.getByRole("link", { name: /pepe\.webp/ });
+    await expect(attachedFile).toHaveAttribute("href", /^\/api\/files\/\d+$/);
+    const toggleDetails = a.getByRole("button", { name: "Детали чата" });
+    await toggleDetails.click();
+    await expect(chatDetails).toBeHidden();
+    await toggleDetails.click();
+    await expect(attachedFile).toBeVisible();
     const out =
-      (process.env.NIMB_DESIGN_EVIDENCE ||
-        "/workspace/nimb-graphite-evidence") + "/scenarios";
+      (process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-studio-evidence") +
+      "/scenarios";
     await mkdir(out, { recursive: true });
     await a.screenshot({ path: out + "/real-chat-desktop.png" });
     await b.screenshot({ path: out + "/real-chat-phone.png" });

@@ -4,7 +4,7 @@ import { redesignFixture } from "./fixtures/redesign";
 import { navigate } from "./navigation";
 
 const evidence =
-  process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-graphite-evidence";
+  process.env.NIMB_DESIGN_EVIDENCE || "/workspace/nimb-studio-evidence";
 test("all primary screens fit the four release widths, with screenshots and keyboard/motion checks", async ({
   page,
 }) => {
@@ -54,6 +54,14 @@ test("all primary screens fit the four release widths, with screenshots and keyb
         false,
       );
       measurements.push({ width, screen, ...bounds });
+      await page
+        .locator(".workspace-dialog:visible")
+        .evaluateAll(async (panels) => {
+          const animations = panels.flatMap((panel) => panel.getAnimations());
+          await Promise.allSettled(
+            animations.map((animation) => animation.finished),
+          );
+        });
       await page.screenshot({ path: `${directory}/${screen}.png` });
     }
     await navigate(page, "Чаты");
@@ -139,6 +147,12 @@ test("all primary screens fit the four release widths, with screenshots and keyb
         await page.keyboard.press("Escape");
         await expect(dialog).toBeHidden();
         await expect(edit).toBeFocused();
+        await page
+          .getByRole("button", { name: "Контакты", exact: true })
+          .click();
+        await expect(
+          page.getByRole("heading", { name: "Контакты", exact: true }),
+        ).toBeFocused();
       }
       if (file === "market") {
         await page

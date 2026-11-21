@@ -93,7 +93,7 @@ test("mobile can pin, archive, restore and save a message privately", async ({
     .getByRole("button", { name: "Действия с чатом", exact: true })
     .click();
   await page.getByRole("button", { name: /^Закрепить чат/ }).click();
-  expect(preferences.chatPinned).toBe(true);
+  await expect.poll(() => preferences.chatPinned).toBe(true);
   await page
     .getByRole("button", { name: "Действия с сообщением", exact: true })
     .click();
@@ -134,6 +134,11 @@ test("mobile can pin, archive, restore and save a message privately", async ({
     .getByRole("button", { name: "Действия с чатом", exact: true })
     .click();
   await page.getByRole("button", { name: /^Вернуть из архива/ }).click();
+  await expect(
+    page
+      .locator(".chat-filters")
+      .getByRole("button", { name: "Все", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   expect(preferences.archived).toBe(false);
   await page.locator(".saved-chat").click();
   await expect(page.locator(".saved-card")).toContainText(message.text);

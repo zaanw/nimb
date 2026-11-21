@@ -26,6 +26,8 @@ import {
   LogOut,
   MessageCircle,
   Paperclip,
+  FileText,
+  PanelRight,
   Plus,
   Search,
   Send,
@@ -110,6 +112,7 @@ import "./market.css";
 import "./rooms.css";
 import "./panels.css";
 import "./collection-surfaces.css";
+import "./studio.css";
 import { SettingsMenu, SettingsOverview } from "./SettingsMenu";
 initializePreferences();
 const Market = React.lazy(() =>
@@ -231,6 +234,7 @@ function App() {
   const workspaceTrigger = useRef<HTMLElement | null>(null);
   const profileTrigger = useRef<HTMLElement | null>(null);
   const [selected, setSelected] = useState<Chat | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(true);
   const [walletOpen, setWalletOpen] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
   const [search, setSearch] = useState("");
@@ -530,7 +534,13 @@ function App() {
   }, [me.data?.user.id, qc]);
   useEffect(() => {
     const area = end.current?.closest(".message-area");
-    area?.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
+    const reducedMotion =
+      document.documentElement.dataset.reduceMotion === "true" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    area?.scrollTo({
+      top: area.scrollHeight,
+      behavior: reducedMotion ? "auto" : "smooth",
+    });
   }, [messages.data?.pages[0]?.messages.at(-1)?.id, selected?.id]);
   useEffect(() => {
     if (!me.data) return;
@@ -871,7 +881,7 @@ function App() {
   return (
     <div
       className={
-        "shell " +
+        "shell studio-shell " +
         (activeTab === "market" ? "market-open " : "") +
         (messenger ? "messenger-shell" : "") +
         (messenger && (selected || (!profilePanel && profile))
@@ -1252,7 +1262,7 @@ function App() {
               "screen " +
               (messenger
                 ? selected
-                  ? "conversation-screen"
+                  ? "conversation-screen" + (detailsOpen ? " with-details" : "")
                   : profile && !profilePanel
                     ? "chat-profile-screen"
                     : "conversation-placeholder"
@@ -1261,7 +1271,7 @@ function App() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           >
             {activeTab === "market" ? (
               <React.Suspense
@@ -1290,224 +1300,252 @@ function App() {
               />
             ) : messenger && selected && other ? (
               <>
-                <header className="chat-header">
-                  <button
-                    className="icon-button"
-                    onClick={() => setSelected(null)}
-                    aria-label="Назад"
-                  >
-                    <ArrowLeft size={20} />
-                  </button>
-                  <button
-                    className="person-button"
-                    onClick={() =>
+                <div className="conversation-thread">
+                  <header className="chat-header">
+                    <button
+                      className="icon-button"
+                      onClick={() => setSelected(null)}
+                      aria-label="Назад"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                    <button
+                      className="person-button"
+                      onClick={() =>
+                        currentChat?.kind === "direct"
+                          ? showProfile(other)
+                          : setCommunityInfo(true)
+                      }
+                    >
+                      {currentChat && (
+                        <ChatAvatar chat={currentChat} user={other} />
+                      )}
+                      <span>
+                        <strong>
+                          <UserName user={other} />
+                        </strong>
+                        <small>
+                          {currentChat?.kind === "direct"
+                            ? `@${other.username}${other.online === true ? " · в сети" : ""}`
+                            : `${currentChat?.members.length || 0} участников`}
+                        </small>
+                      </span>
+                    </button>
+                    <button
+                      className="icon-button chat-close"
+                      onClick={() => {
+                        setShowMessageSearch(!showMessageSearch);
+                        if (showMessageSearch) setMessageSearch("");
+                      }}
+                      aria-label={
+                        showMessageSearch ? "Закрыть поиск" : "Поиск по чату"
+                      }
+                    >
+                      {showMessageSearch ? (
+                        <X size={20} />
+                      ) : (
+                        <Search size={20} />
+                      )}
+                    </button>
+                    <button
+                      className="icon-button thread-details-toggle"
+                      aria-label="Детали чата"
+                      aria-expanded={detailsOpen}
+                      aria-controls="conversation-details"
+                      onClick={() => setDetailsOpen((open) => !open)}
+                    >
+                      <PanelRight size={19} aria-hidden="true" />
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label="Действия с чатом"
+                      onClick={() => setChatTools(true)}
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                  </header>
+                  {typingChat === selected.id && (
+                    <div className="typing-indicator">Печатает…</div>
+                  )}
+                  {showMessageSearch && (
+                    <div className="message-search">
+                      <Search size={16} />
+                      <input
+                        autoFocus
+                        value={messageSearch}
+                        onChange={(e) => setMessageSearch(e.target.value)}
+                        placeholder="Поиск по переписке"
+                        aria-label="Поиск по переписке"
+                      />
+                    </div>
+                  )}
+                  <div className="message-area">
+                    {messages.isError && (
+                      <div className="chat-load-error">
+                        Не удалось загрузить сообщения.{" "}
+                        <button onClick={() => messages.refetch()}>
+                          Повторить
+                        </button>
+                      </div>
+                    )}
+                    {!allMessages.length &&
+                      !messages.isLoading &&
+                      !messages.isError && (
+                        <div className="conversation-start">
+                          <MessageCircle size={30} strokeWidth={1.4} />
+                          <strong>Нет сообщений</strong>
+                          <small>Напишите первое сообщение</small>
+                        </div>
+                      )}
+                    {messages.isLoading && (
+                      <p className="muted">Загрузка сообщений…</p>
+                    )}
+                    {messages.hasNextPage && (
+                      <button
+                        className="load-earlier"
+                        disabled={messages.isFetchingNextPage}
+                        onClick={() => messages.fetchNextPage()}
+                      >
+                        {messages.isFetchingNextPage
+                          ? "Загрузка…"
+                          : "Загрузить ранние сообщения"}
+                      </button>
+                    )}
+                    {allMessages.map((m, index) => (
+                      <React.Fragment key={m.id}>
+                        {(index === 0 ||
+                          new Date(
+                            allMessages[index - 1].createdAt,
+                          ).toDateString() !==
+                            new Date(m.createdAt).toDateString()) && (
+                          <div className="message-date">
+                            {new Date(m.createdAt).toLocaleDateString("ru-RU", {
+                              day: "numeric",
+                              month: "long",
+                            })}
+                          </div>
+                        )}
+                        <MessageBubble
+                          key={m.id}
+                          message={m}
+                          me={user.id}
+                          showViews={currentChat?.kind === "channel"}
+                          read={
+                            currentChat?.kind === "direct" &&
+                            !!currentChat.members.find(
+                              (member) =>
+                                member.user.id !== user.id &&
+                                member.lastReadId >= m.id,
+                            )
+                          }
+                          sender={
+                            currentChat?.kind !== "direct" &&
+                            m.senderId !== user.id
+                              ? currentChat?.members.find(
+                                  (member) => member.user.id === m.senderId,
+                                )?.user || "Участник"
+                              : undefined
+                          }
+                          canPin={
+                            currentChat?.kind === "direct" ||
+                            ["owner", "admin"].includes(
+                              currentChat?.members.find(
+                                (member) => member.user.id === user.id,
+                              )?.role || "",
+                            )
+                          }
+                          onReply={setReplyTo}
+                          onForward={setForwardMessage}
+                          onError={setError}
+                        />
+                      </React.Fragment>
+                    ))}
+                    <div ref={end} />
+                  </div>
+                  {currentChat?.kind === "channel" &&
+                  currentChat.members.find((m) => m.user.id === user.id)
+                    ?.role === "member" ? (
+                    <p className="muted">
+                      Публиковать в канале могут только администраторы.
+                    </p>
+                  ) : (
+                    <div className="composer-wrap">
+                      {replyTo && (
+                        <div className="reply-compose">
+                          Ответ: {replyTo.text}
+                          <button
+                            onClick={() => setReplyTo(null)}
+                            aria-label="Отменить ответ"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      )}
+                      <form
+                        className="composer"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (text.trim() && !submitMessage.isPending)
+                            submitMessage.mutate({
+                              chatId: selected.id,
+                              text,
+                              replyToId: replyTo?.id,
+                            });
+                        }}
+                      >
+                        <label
+                          className="attach-button"
+                          title="Прикрепить изображение или PDF"
+                        >
+                          <Paperclip size={19} />
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            disabled={uploadFile.isPending}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) uploadFile.mutate(file);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <input
+                          value={text}
+                          maxLength={4000}
+                          onChange={(e) => {
+                            setText(e.target.value);
+                            if (e.target.value.trim())
+                              socketRef.current?.emit("typing", {
+                                chatId: selected.id,
+                              });
+                          }}
+                          name="message"
+                          autoComplete="off"
+                          placeholder="Написать сообщение…"
+                          aria-label="Сообщение"
+                        />
+                        <button
+                          disabled={!text.trim() || submitMessage.isPending}
+                          aria-label="Отправить"
+                        >
+                          <Send size={19} />
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+                {detailsOpen && (
+                  <ConversationDetails
+                    chat={currentChat ?? selected}
+                    user={other}
+                    messages={allMessages}
+                    searching={!!messageSearch}
+                    onOpen={() =>
                       currentChat?.kind === "direct"
                         ? showProfile(other)
                         : setCommunityInfo(true)
                     }
-                  >
-                    {currentChat && (
-                      <ChatAvatar chat={currentChat} user={other} />
-                    )}
-                    <span>
-                      <strong>
-                        <UserName user={other} />
-                      </strong>
-                      <small>
-                        {currentChat?.kind === "direct"
-                          ? `@${other.username}${other.online === true ? " · в сети" : ""}`
-                          : `${currentChat?.members.length || 0} участников`}
-                      </small>
-                    </span>
-                  </button>
-                  <button
-                    className="icon-button chat-close"
-                    onClick={() => {
-                      setShowMessageSearch(!showMessageSearch);
-                      if (showMessageSearch) setMessageSearch("");
-                    }}
-                    aria-label={
-                      showMessageSearch ? "Закрыть поиск" : "Поиск по чату"
-                    }
-                  >
-                    {showMessageSearch ? <X size={20} /> : <Search size={20} />}
-                  </button>
-                  <button
-                    className="icon-button"
-                    aria-label="Действия с чатом"
-                    onClick={() => setChatTools(true)}
-                  >
-                    <MoreHorizontal size={20} />
-                  </button>
-                </header>
-                {typingChat === selected.id && (
-                  <div className="typing-indicator">Печатает…</div>
-                )}
-                {showMessageSearch && (
-                  <div className="message-search">
-                    <Search size={16} />
-                    <input
-                      autoFocus
-                      value={messageSearch}
-                      onChange={(e) => setMessageSearch(e.target.value)}
-                      placeholder="Поиск по переписке"
-                      aria-label="Поиск по переписке"
-                    />
-                  </div>
-                )}
-                <div className="message-area">
-                  {messages.isError && (
-                    <div className="chat-load-error">
-                      Не удалось загрузить сообщения.{" "}
-                      <button onClick={() => messages.refetch()}>
-                        Повторить
-                      </button>
-                    </div>
-                  )}
-                  {!allMessages.length &&
-                    !messages.isLoading &&
-                    !messages.isError && (
-                      <div className="conversation-start">
-                        <MessageCircle size={30} strokeWidth={1.4} />
-                        <strong>Нет сообщений</strong>
-                        <small>Напишите первое сообщение</small>
-                      </div>
-                    )}
-                  {messages.isLoading && (
-                    <p className="muted">Загрузка сообщений…</p>
-                  )}
-                  {messages.hasNextPage && (
-                    <button
-                      className="load-earlier"
-                      disabled={messages.isFetchingNextPage}
-                      onClick={() => messages.fetchNextPage()}
-                    >
-                      {messages.isFetchingNextPage
-                        ? "Загрузка…"
-                        : "Загрузить ранние сообщения"}
-                    </button>
-                  )}
-                  {allMessages.map((m, index) => (
-                    <React.Fragment key={m.id}>
-                      {(index === 0 ||
-                        new Date(
-                          allMessages[index - 1].createdAt,
-                        ).toDateString() !==
-                          new Date(m.createdAt).toDateString()) && (
-                        <div className="message-date">
-                          {new Date(m.createdAt).toLocaleDateString("ru-RU", {
-                            day: "numeric",
-                            month: "long",
-                          })}
-                        </div>
-                      )}
-                      <MessageBubble
-                        key={m.id}
-                        message={m}
-                        me={user.id}
-                        showViews={currentChat?.kind === "channel"}
-                        read={
-                          currentChat?.kind === "direct" &&
-                          !!currentChat.members.find(
-                            (member) =>
-                              member.user.id !== user.id &&
-                              member.lastReadId >= m.id,
-                          )
-                        }
-                        sender={
-                          currentChat?.kind !== "direct" &&
-                          m.senderId !== user.id
-                            ? currentChat?.members.find(
-                                (member) => member.user.id === m.senderId,
-                              )?.user || "Участник"
-                            : undefined
-                        }
-                        canPin={
-                          currentChat?.kind === "direct" ||
-                          ["owner", "admin"].includes(
-                            currentChat?.members.find(
-                              (member) => member.user.id === user.id,
-                            )?.role || "",
-                          )
-                        }
-                        onReply={setReplyTo}
-                        onForward={setForwardMessage}
-                        onError={setError}
-                      />
-                    </React.Fragment>
-                  ))}
-                  <div ref={end} />
-                </div>
-                {currentChat?.kind === "channel" &&
-                currentChat.members.find((m) => m.user.id === user.id)?.role ===
-                  "member" ? (
-                  <p className="muted">
-                    Публиковать в канале могут только администраторы.
-                  </p>
-                ) : (
-                  <div className="composer-wrap">
-                    {replyTo && (
-                      <div className="reply-compose">
-                        Ответ: {replyTo.text}
-                        <button
-                          onClick={() => setReplyTo(null)}
-                          aria-label="Отменить ответ"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    )}
-                    <form
-                      className="composer"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (text.trim() && !submitMessage.isPending)
-                          submitMessage.mutate({
-                            chatId: selected.id,
-                            text,
-                            replyToId: replyTo?.id,
-                          });
-                      }}
-                    >
-                      <label
-                        className="attach-button"
-                        title="Прикрепить изображение или PDF"
-                      >
-                        <Paperclip size={19} />
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,application/pdf"
-                          disabled={uploadFile.isPending}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) uploadFile.mutate(file);
-                            e.target.value = "";
-                          }}
-                        />
-                      </label>
-                      <input
-                        value={text}
-                        maxLength={4000}
-                        onChange={(e) => {
-                          setText(e.target.value);
-                          if (e.target.value.trim())
-                            socketRef.current?.emit("typing", {
-                              chatId: selected.id,
-                            });
-                        }}
-                        name="message"
-                        autoComplete="off"
-                        placeholder="Написать сообщение…"
-                        aria-label="Сообщение"
-                      />
-                      <button
-                        disabled={!text.trim() || submitMessage.isPending}
-                        aria-label="Отправить"
-                      >
-                        <Send size={19} />
-                      </button>
-                    </form>
-                  </div>
+                  />
                 )}
               </>
             ) : messenger && profile && !profilePanel ? (
@@ -1525,7 +1563,20 @@ function App() {
                 />
               </>
             ) : messenger ? (
-              <p className="conversation-hint">Откройте переписку</p>
+              <section className="chat-entry">
+                <span className="chat-entry-mark" aria-hidden="true">
+                  <Brand markOnly />
+                </span>
+                <h2>Выберите чат</h2>
+                <button
+                  className="text-action"
+                  onClick={() =>
+                    document.getElementById("people-search")?.focus()
+                  }
+                >
+                  Найти собеседника <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </section>
             ) : activeTab === "profile" ? (
               ownProfile
             ) : activeTab === "feed" ? (
@@ -1759,6 +1810,78 @@ function App() {
     </div>
   );
 }
+function ConversationDetails({
+  chat,
+  user,
+  messages,
+  searching,
+  onOpen,
+}: {
+  chat: Chat;
+  user: User;
+  messages: Message[];
+  searching: boolean;
+  onOpen: () => void;
+}) {
+  const files = messages
+    .filter((message) => message.attachment)
+    .slice(-6)
+    .reverse();
+  return (
+    <aside
+      id="conversation-details"
+      className="thread-details"
+      aria-label="Сведения о чате"
+    >
+      <button className="thread-person" onClick={onOpen}>
+        <ChatAvatar chat={chat} user={user} />
+        <span>
+          <strong>
+            <UserName user={user} />
+          </strong>
+          <small>
+            {chat.kind === "direct"
+              ? "@" + user.username
+              : chat.members.length + " участников"}
+          </small>
+        </span>
+        <ChevronRight size={17} aria-hidden="true" />
+      </button>
+      <section className="thread-files">
+        <h2>{searching ? "Файлы в результатах поиска" : "Последние файлы"}</h2>
+        {files.length ? (
+          <ul>
+            {files.map(
+              ({ attachment, id }) =>
+                attachment && (
+                  <li key={id}>
+                    <a
+                      href={`/api/files/${attachment.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className="thread-file-icon">
+                        <FileText size={17} aria-hidden="true" />
+                      </span>
+                      <span>
+                        <strong>{attachment.name}</strong>
+                        <small>
+                          {Math.max(1, Math.round(attachment.size / 1024))} КБ
+                        </small>
+                      </span>
+                    </a>
+                  </li>
+                ),
+            )}
+          </ul>
+        ) : (
+          <p>{searching ? "Файлы не найдены" : "Вложения появятся здесь"}</p>
+        )}
+      </section>
+    </aside>
+  );
+}
+
 function DesktopBar({
   user,
   tab,
@@ -1792,6 +1915,13 @@ function DesktopBar({
 
   return (
     <header className="app-topbar" inert={blocked}>
+      <button
+        className="topbar-brand"
+        onClick={() => nav("chats")}
+        aria-label="Nimb — на главную"
+      >
+        <Brand />
+      </button>
       <div
         className="topbar-disclosure"
         ref={disclosure}
@@ -1827,20 +1957,23 @@ function DesktopBar({
           }}
         />
       </div>
-      <button
-        className="topbar-account"
-        aria-label="Мой профиль"
-        title="Мой профиль"
-        onClick={() => nav("profile")}
-      >
-        <Avatar user={user} />
-        <span className="topbar-user">
-          <strong>
-            <UserName user={user} />
-          </strong>
-          <small>@{user.username}</small>
-        </span>
-      </button>
+      <nav className="dock-sections" aria-label="Основные разделы">
+        {(
+          [
+            ["chats", "Чаты", MessagesSquare],
+            ["feed", "Лента", AlignJustify],
+            ["market", "Маркет", Store],
+          ] as const
+        ).map(([destination, label, Icon]) => (
+          <button
+            key={destination}
+            aria-current={tab === destination ? "page" : undefined}
+            onClick={() => nav(destination)}
+          >
+            <Icon size={18} aria-hidden="true" /> <span>{label}</span>
+          </button>
+        ))}
+      </nav>
       <div className="topbar-actions">
         {isAdmin && (
           <button
@@ -1862,11 +1995,18 @@ function DesktopBar({
           <Settings size={19} aria-hidden="true" />
         </button>
         <button
-          className="topbar-brand"
-          onClick={() => nav("chats")}
-          aria-label="Nimb — на главную"
+          className="topbar-account"
+          aria-label="Мой профиль"
+          title="Мой профиль"
+          onClick={() => nav("profile")}
         >
-          <Brand markOnly />
+          <Avatar user={user} />
+          <span className="topbar-user">
+            <strong>
+              <UserName user={user} />
+            </strong>
+            <small>@{user.username}</small>
+          </span>
         </button>
       </div>
     </header>
@@ -1955,6 +2095,7 @@ function Profile({
   const [giftOpen, setGiftOpen] = useState(false);
   const [shareNotice, setShareNotice] = useState("");
   const [actionsOpen, setActionsOpen] = useState(false);
+  const detailsHeading = useRef<HTMLHeadingElement>(null);
   async function share() {
     const url = new URL(location.href);
     url.search = "";
@@ -1985,7 +2126,6 @@ function Profile({
       }
     >
       <PageHeading
-        eyebrow={own ? "ЛИЧНОЕ" : "ПОЛЬЗОВАТЕЛЬ"}
         title={own ? "Мой профиль" : "Профиль"}
         action={
           <div className="profile-heading-tools">
@@ -2040,6 +2180,17 @@ function Profile({
                         {user.online ? "В сети" : "Не в сети"}
                       </small>
                     )}
+                    <button
+                      className="profile-contact-link"
+                      onClick={() => {
+                        detailsHeading.current?.focus({ preventScroll: true });
+                        detailsHeading.current?.scrollIntoView({
+                          block: "start",
+                        });
+                      }}
+                    >
+                      Контакты <ArrowRight size={13} aria-hidden="true" />
+                    </button>
                   </div>
                   {!own && (
                     <div className="profile-quick-actions">
@@ -2073,18 +2224,6 @@ function Profile({
                     Описание скрыто владельцем.
                   </p>
                 )}
-              </div>
-              <div className="profile-details">
-                <ProfileIdentifiers user={user} />
-                <ProfileLinks user={user} />
-                <div className="profile-meta">
-                  <span>
-                    <Hash size={15} /> ID {user.id}
-                  </span>
-                  <span>
-                    <CalendarDays size={15} /> С {date(user.createdAt)}
-                  </span>
-                </div>
               </div>
             </div>
           </section>
@@ -2133,6 +2272,21 @@ function Profile({
           </div>
           {profileTab === "posts" && <ProfilePosts user={user} />}
         </section>
+        <div className="profile-details">
+          <h2 ref={detailsHeading} tabIndex={-1}>
+            Контакты
+          </h2>
+          <ProfileIdentifiers user={user} />
+          <ProfileLinks user={user} />
+          <div className="profile-meta">
+            <span>
+              <Hash size={15} /> ID {user.id}
+            </span>
+            <span>
+              <CalendarDays size={15} /> С {date(user.createdAt)}
+            </span>
+          </div>
+        </div>
         {own && !user.hasMusic && (
           <div className="profile-about profile-music-empty">
             <ProfileMusic user={user} own />

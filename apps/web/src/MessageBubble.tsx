@@ -71,12 +71,22 @@ export function MessageBubble({
   }
   const emojis = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
   const status = read ? "Прочитано" : m.delivered ? "Доставлено" : "Отправлено";
+  const compact =
+    !editing &&
+    !sender &&
+    !m.attachment &&
+    !m.pinned &&
+    !m.forwarded &&
+    !m.replyTo &&
+    !m.reactions?.length &&
+    m.text.length <= 76 &&
+    !m.text.includes("\n");
   return (
     <div className={"message-row " + (m.senderId === me ? "mine" : "")}>
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bubble"
+        className={compact ? "bubble bubble-compact" : "bubble"}
       >
         {sender && (
           <strong className="message-author">
