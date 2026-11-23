@@ -169,7 +169,7 @@ test("ordinary accounts see the shared design but cannot edit Plus appearance", 
   await fixture(page, false, false);
   await openNavigation(page);
   await page
-    .locator(".app-topbar")
+    .locator(".workspace-sidebar")
     .getByRole("button", { name: "Настройки", exact: true })
     .click();
   await page.getByRole("button", { name: "nimb Plus", exact: true }).click();

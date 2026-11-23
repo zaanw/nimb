@@ -21,13 +21,18 @@ export type Identity = {
   profileAccent?: string;
   collectibleNumber?: string | null;
 };
-export function VerifiedBadge() {
+export function VerifiedBadge({
+  decorative = false,
+}: {
+  decorative?: boolean;
+}) {
   return (
     <svg
       className="verified-badge"
       viewBox="0 0 24 24"
-      role="img"
-      aria-label="Подтверждён владельцем nimb"
+      role={decorative ? undefined : "img"}
+      aria-hidden={decorative || undefined}
+      aria-label={decorative ? undefined : "Подтверждён владельцем nimb"}
     >
       <title>Подтверждён владельцем nimb</title>
       <path
@@ -37,7 +42,7 @@ export function VerifiedBadge() {
       <path
         d="m7.7 11.8 2.8 2.8 5.8-6"
         fill="none"
-        stroke="#15202c"
+        stroke="var(--accent-ink, #090909)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -46,6 +51,7 @@ export function VerifiedBadge() {
   );
 }
 export function BadgeIcon({ id, size = 22 }: { id: string; size?: number }) {
+  if (id === "verified") return <VerifiedBadge decorative />;
   const Icon = (
     {
       bug_hunter: Bug,
@@ -54,7 +60,11 @@ export function BadgeIcon({ id, size = 22 }: { id: string; size?: number }) {
       plus: Plus,
     } as const
   )[id as "plus"];
-  return Icon ? <Icon size={size} /> : <Gem size={size} />;
+  return Icon ? (
+    <Icon size={size} strokeWidth={1.7} aria-hidden="true" />
+  ) : (
+    <Gem size={size} strokeWidth={1.7} aria-hidden="true" />
+  );
 }
 export function UserName({ user }: { user: Identity }) {
   const custom = user.id === 1 || user.plus;
@@ -67,8 +77,12 @@ export function UserName({ user }: { user: Identity }) {
       </span>
       {user.verified && <VerifiedBadge />}
       {user.plus && (
-        <span className="plus-inline" title="nimb Plus" aria-label="nimb Plus">
-          <Plus size={12} strokeWidth={3} />
+        <span
+          className="plus-inline"
+          title="Plus · значок и персонализация профиля"
+          aria-label="nimb Plus"
+        >
+          <Plus size={11} strokeWidth={2} aria-hidden="true" />
         </span>
       )}
     </span>
@@ -251,9 +265,7 @@ export function IdentitySettings({ user }: { user: Identity }) {
           <h2>nimb Plus</h2>
         </div>
       </div>
-      <p>
-        Шрифт, эффект имени и цвет профиля.
-      </p>
+      <p>Шрифт, эффект имени и цвет профиля.</p>
       {!allowed ? (
         <div className="plus-locked">
           <Sparkles size={24} />

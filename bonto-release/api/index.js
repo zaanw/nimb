@@ -899,7 +899,15 @@ app.post('/api/password', { config: { rateLimit: { max: 5, timeWindow: '1 minute
 if (process.env.STATIC_ROOT) {
     await app.register(fastifyStatic, { root: resolve(process.env.STATIC_ROOT), wildcard: false });
 }
-const io = new Server(app.server, { cors: { origin, credentials: true }, allowRequest: (req, cb) => cb(null, req.headers.origin === origin) });
+const io = new Server(app.server, {
+    cors: { origin, credentials: true },
+    allowRequest: (req, done) => {
+        // Browsers omit Origin on same-origin polling GETs.
+        const allowed = req.headers.origin === origin ||
+            (req.headers.origin === undefined && req.headers['sec-fetch-site'] === 'same-origin');
+        done(null, allowed);
+    },
+});
 io.use(async (socket, next) => { try {
     const raw = socket.handshake.headers.cookie?.split(';').map(x => x.trim()).find(x => x.startsWith('nimb_session='))?.slice('nimb_session='.length);
     const s = await session(raw);

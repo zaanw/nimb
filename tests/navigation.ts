@@ -6,7 +6,7 @@ export async function openNavigation(page: Page) {
     await panel.getByRole("button", { name: "Закрыть", exact: true }).click();
     await panel.waitFor({ state: "hidden" });
   }
-  await page.locator(".app-topbar").waitFor({ state: "visible" });
+  await page.locator(".workspace-sidebar").waitFor({ state: "visible" });
 }
 export async function navigate(page: Page, label: string) {
   if ((page.viewportSize()?.width || 0) <= 760) {
@@ -28,11 +28,9 @@ export async function navigate(page: Page, label: string) {
         .click();
   } else {
     await openNavigation(page);
-    const bar = page.locator(".app-topbar");
-    const destination = bar.getByRole("button", { name: label, exact: true });
-    if (!(await destination.count())) {
-      await bar.getByRole("button", { name: "Меню разделов" }).click();
-    }
-    await destination.click();
+    await page
+      .locator(".workspace-sidebar")
+      .getByRole("button", { name: label, exact: true })
+      .click();
   }
 }

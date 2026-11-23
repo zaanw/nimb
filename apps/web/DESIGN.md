@@ -1,22 +1,20 @@
 # Nimb
 
-## Direction
+## Направление
 
-Fully dark. Ink-blue work areas, a plum navigation field and apricot actions. A steady workspace and short transitions keep attention on the person, conversation and collectible. Slasher references inform density and content hierarchy. Nimb has its own navigation, layout and assets.
+Монохромный мессенджер с контрастным текстом, белым акцентом действий и плотной навигацией. HTML-референсы Slasher помогают выбрать плотность списка, иерархию переписки и пропорции коллекции. Баннеры, подарки и выбранная пользователем кастомизация профиля сохраняют собственные цвета.
 
-## Layout
+## Компоновка
 
-- The desktop dock contains the three primary destinations and account controls. Archive, saved items and wallet remain reachable through their existing actions. The dock follows the same primary destinations as the phone's bottom navigation.
-- Chat lists use independent scroll. At 1180px and wider the active chat can expose a dismissible file pane. The message measure caps at 850px. A phone opens the thread full screen, with return navigation in the header.
-- Account and settings open as right sheets on desktop. Mobile account/settings are ordinary screens. Profile collectibles precede secondary details.
-- Market filters sit beside the catalog from 950px. Mobile products use a two-column grid. A collectible detail pairs the illustration and item facts from tablet width.
+- С 761 px чаты, лента и маркет собраны в верхней части сайдбара шириной 280 px. Поиск и список чатов занимают основное место. Кошелёк, избранное, профиль, настройки и доступная аккаунту админка закреплены внизу. При отсутствии открытого чата в центре доступны недавние переписки.
+- Активная переписка занимает оставшуюся ширину. Текст сообщений по умолчанию 15 px и учитывает масштаб пользователя. Ввод поддерживает многострочный текст, вложения и быстрые эмодзи. Enter отправляет сообщение, Shift+Enter добавляет строку.
+- Правая панель открывается по кнопке. В ней есть профиль или описание сообщества, недавние вложения из загруженной истории и коллекция собеседника. При ограниченной ширине открытая панель накладывается на область переписки. При смене диалога она закрывается.
+- В профиле баннер, аватар и действия объединены. Контакты и бейджи расположены рядом с коллекцией на широком экране и выше неё на телефоне. Значение бейджа доступно при наведении или фокусе и по нажатию. Коллекция и публикации используют общий набор вкладок. Каналы открывают описание и управление через сведения о канале.
+- Маркет помещает вкладки, поиск, фильтр редкости и сортировку перед сеткой. В магазине сортировка работает по всему каталогу, в коллекции по загруженным страницам.
+- До 760 px диалог занимает весь экран. Нижняя навигация остаётся на уровне разделов. Маркет использует две колонки, профиль и настройки прокручиваются независимо.
 
-## Tokens
+## Токены и взаимодействия
 
-Work surface `#121b29`, conversation `#101926`, navigation `#262131`, raised surface `#26354a`. Text `#f4f2f5`, secondary `#c1c9d8`, muted `#a0acc1`. Apricot `#ffc9a3` indicates key actions and active navigation. Link blue `#a9d7ec` and connection mint `#a0deca` have separate roles.
+Переменные в `src/studio.css` определяют фон, поверхности, цвет текста, акцент, шкалу отступов, размеры текста и радиусы. Inter используется по умолчанию. Rubik и другие сохранённые настройки шрифта доступны пользователям. Иконки интерфейса используют Lucide, бейджи профиля используют общие SVG-иконки.
 
-Retain local Rubik and Inter choices. Use 13–15px text in controls and 15px messages with the user's configured scale. Keep secondary metadata readable. Cards serve content, notably the gift illustration and its factual caption.
-
-## Interaction
-
-Visible keyboard focus uses apricot. Escape dismisses the top dialog and restores its trigger. Right sheets enter over 190ms with a short horizontal move. The browser or Nimb reduced-motion preference disables the sheet slide and smooth scrolling. Keep all server contracts and the existing permissions for conversations, files and purchases.
+Клавиатурный фокус виден на элементах управления. Escape закрывает активную подсказку, диалог или панель. Типовые переходы занимают 150 мс, раскрытие панелей занимает до 230 мс. Системное предпочтение уменьшенного движения и настройка Nimb учитываются в переходах, прокрутке и скелетонах. Подгрузка старой истории сохраняет позицию чтения. К свежим сообщениям можно перейти по отдельной кнопке.

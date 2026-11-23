@@ -1,8 +1,8 @@
 import { Dialog } from "./UI";
 import { GiftCard, GiftDetails, type CollectibleGift } from "./CollectibleGift";
 import { GiftArtwork } from "./GiftArtwork";
-import { BadgeIcon } from "./Identity";
-import { useState } from "react";
+import { BadgeIcon, type Identity } from "./Identity";
+import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Gift as GiftIcon } from "lucide-react";
 type Template = {
@@ -17,10 +17,9 @@ type Gift = CollectibleGift;
 type Badge = {
   id: string;
   name: string;
-  icon: string;
   description: string;
-  condition: string;
-  awardedAt: string;
+  condition?: string;
+  awardedAt?: string;
 };
 async function api<T>(
   path: string,
@@ -43,12 +42,14 @@ export function Collections({
   section = "all",
   openCatalog = false,
   onCatalogClose,
+  identity,
 }: {
   userId: number;
   own: boolean;
   section?: "all" | "badges" | "gifts";
   openCatalog?: boolean;
   onCatalogClose?: () => void;
+  identity?: Identity;
 }) {
   const qc = useQueryClient();
   const [detail, setDetail] = useState<Gift | Badge | null>(null);
@@ -87,35 +88,58 @@ export function Collections({
       qc.invalidateQueries({ queryKey: ["gifts", userId] });
     },
   });
+  const awards = badgeQuery.data?.badges ?? [];
+  const badges = [
+    ...(identity?.verified && !awards.some((badge) => badge.id === "verified")
+      ? [
+          {
+            id: "verified",
+            name: "Verified",
+            description: "Владелец Nimb подтвердил подлинность аккаунта.",
+          },
+        ]
+      : []),
+    ...(identity?.plus && !awards.some((badge) => badge.id === "plus")
+      ? [
+          {
+            id: "plus",
+            name: "Plus",
+            description:
+              "Для этого аккаунта доступна персонализация профиля Nimb Plus.",
+          },
+        ]
+      : []),
+    ...awards,
+  ];
   return (
     <>
       {section !== "gifts" && (
-        <section className="collection-section badges-section">
+        <section
+          className="collection-section badges-section"
+          aria-label="Значки профиля"
+        >
           <div className="list-top">
             <span>Значки</span>
-            <span>{badgeQuery.data?.badges.length || 0}</span>
+            <span>{badges.length}</span>
           </div>
+          {badges.length > 0 && (
+            <div className="badge-list">
+              {badges.map((badge) => (
+                <ProfileBadge
+                  key={badge.id}
+                  badge={badge}
+                  onOpen={() => setDetail(badge)}
+                />
+              ))}
+            </div>
+          )}
           {badgeQuery.isLoading ? (
             <p className="muted">Загрузка…</p>
           ) : badgeQuery.isError ? (
-            <p className="muted">Не удалось загрузить значки.</p>
-          ) : badgeQuery.data?.badges.length ? (
-            <div className="badge-list">
-              {badgeQuery.data.badges.map((b) => (
-                <button
-                  className={"badge-token badge-" + b.id}
-                  title={b.name}
-                  key={b.id}
-                  onClick={() => setDetail(b)}
-                >
-                  <BadgeIcon id={b.id} />
-                  <span>{b.name}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
+            <p className="muted">Не удалось загрузить выданные значки.</p>
+          ) : !badges.length ? (
             <p className="muted">Значков пока нет.</p>
-          )}
+          ) : null}
         </section>
       )}
       {section !== "badges" && (
@@ -202,13 +226,52 @@ export function Collections({
             <BadgeIcon id={detail.id} size={50} />
           </div>
           <p>{detail.description}</p>
-          <p className="muted">
-            {detail.condition}
-            <br />
-            Выдан {new Date(detail.awardedAt).toLocaleDateString("ru-RU")}
-          </p>
+          {detail.condition && <p className="muted">{detail.condition}</p>}
+          {detail.awardedAt && (
+            <p className="muted">
+              Выдан {new Date(detail.awardedAt).toLocaleDateString("ru-RU")}
+            </p>
+          )}
         </Dialog>
       )}
     </>
+  );
+}
+
+function ProfileBadge({ badge, onOpen }: { badge: Badge; onOpen: () => void }) {
+  const hint = useId();
+  function positionHint(anchor: HTMLDivElement) {
+    const width = Math.min(190, window.innerWidth * 0.47);
+    const edge = anchor.getBoundingClientRect().left + width;
+    anchor.style.setProperty(
+      "--tip-offset",
+      `${Math.min(0, window.innerWidth - edge - 12)}px`,
+    );
+    delete anchor.dataset.tooltipDismissed;
+  }
+  return (
+    <div
+      className="profile-badge"
+      onPointerEnter={(event) => positionHint(event.currentTarget)}
+      onFocus={(event) => positionHint(event.currentTarget)}
+      onKeyDown={(event) => {
+        if (
+          event.key === "Escape" &&
+          event.currentTarget.matches(":has(:focus-visible)")
+        ) {
+          if (event.currentTarget.dataset.tooltipDismissed) return;
+          event.stopPropagation();
+          event.currentTarget.dataset.tooltipDismissed = "true";
+        }
+      }}
+    >
+      <button className="badge-token" aria-describedby={hint} onClick={onOpen}>
+        <BadgeIcon id={badge.id} size={16} />
+        <span>{badge.name}</span>
+      </button>
+      <span className="profile-badge-tooltip" role="tooltip" id={hint}>
+        {badge.description}
+      </span>
+    </div>
   );
 }

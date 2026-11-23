@@ -50,6 +50,21 @@ export function PageHeading({
     </header>
   );
 }
+export function LoadingRows({
+  label,
+  count = 4,
+}: {
+  label: string;
+  count?: number;
+}) {
+  return (
+    <div className="loading-rows" role="status" aria-label={label}>
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} aria-hidden="true" />
+      ))}
+    </div>
+  );
+}
 export function Dialog({
   title,
   children,

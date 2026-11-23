@@ -137,31 +137,16 @@ export function SettingsMenu({
   );
 }
 export function SettingsOverview({
-  name,
-  username,
-  avatar,
   onSelect,
 }: {
-  name: ReactNode;
-  username: string;
-  avatar: ReactNode;
   onSelect: (section: string) => void;
 }) {
   return (
     <div className="settings-overview">
-      <div className="settings-overview-person">
-        {avatar}
-        <div className="settings-account-name">
-          <h2>{name}</h2>
-          <p>@{username}</p>
-        </div>
-        <button className="outline" onClick={() => onSelect("Аккаунт")}>
-          Открыть аккаунт <ChevronRight size={15} />
-        </button>
-      </div>
-      <h3 className="settings-quick-title">Быстрый доступ</h3>
+      <h2 className="settings-quick-title">Быстрый доступ</h2>
       <div className="settings-overview-links">
         {[
+          ["Аккаунт", "Данные профиля и ссылки", UserRound],
           ["Безопасность", "Пароль и активные сеансы", LockKeyhole],
           ["Уведомления", "Push на этом устройстве", Bell],
           ["Оформление", "Фон переписки и шрифт", Palette],
