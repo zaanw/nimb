@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { UserName, type Identity } from "./Identity";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { MoreHorizontal, Check, CheckCheck, Pin, Eye } from "lucide-react";
 import { useConfirmation } from "./UI";
 export type Message = {
@@ -20,7 +20,7 @@ export type Message = {
   attachment?: { id: number; name: string; mime: string; size: number } | null;
   reactions?: { userId: number; emoji: string }[];
 };
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message: m,
   me,
   read,
@@ -50,6 +50,25 @@ export function MessageBubble({
   const [draft, setDraft] = useState(m.text);
   const [busy, setBusy] = useState(false);
   const { ask, dialog } = useConfirmation();
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const menuRoot = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  useEffect(() => {
+    if (!menu) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !menuRoot.current?.contains(event.target)
+      )
+        setMenu(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [menu]);
   async function action(path: string, method: string, body?: unknown) {
     setBusy(true);
     try {
@@ -84,7 +103,22 @@ export function MessageBubble({
     m.text.length <= 76 &&
     !m.text.includes("\n");
   return (
-    <div className={"message-row " + (m.senderId === me ? "mine" : "")}>
+    <div
+      ref={menuRoot}
+      className={"message-row " + (m.senderId === me ? "mine" : "")}
+      onKeyDown={(event) => {
+        if (
+          !menu ||
+          event.key !== "Escape" ||
+          !(event.target instanceof Node) ||
+          !event.currentTarget.contains(event.target)
+        )
+          return;
+        event.stopPropagation();
+        setMenu(false);
+        menuTrigger.current?.focus();
+      }}
+    >
       <motion.div
         initial={latest ? { opacity: 0, y: 4 } : false}
         animate={{ opacity: 1, y: 0 }}
@@ -142,6 +176,8 @@ export function MessageBubble({
               <img
                 src={`/api/files/${m.attachment.id}`}
                 alt={m.attachment.name}
+                loading="lazy"
+                decoding="async"
               />
             )}
             <span>
@@ -176,6 +212,7 @@ export function MessageBubble({
         </div>
         <div className="message-bottom">
           <button
+            ref={menuTrigger}
             className="message-menu-toggle"
             aria-label="Действия с сообщением"
             aria-expanded={menu}
@@ -257,7 +294,6 @@ export function MessageBubble({
                   await navigator.clipboard.writeText(m.text);
                   setMenu(false);
                   setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
                 } catch {
                   onError(
                     "Не удалось скопировать. Разрешите доступ к буферу обмена.",
@@ -313,4 +349,4 @@ export function MessageBubble({
       {dialog}
     </div>
   );
-}
+});

@@ -57,8 +57,17 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
   try {
     const a = await desktop.newPage(),
       b = await mobile.newPage();
+    // Keep one browser behind a proxy that cannot establish WebSocket connections.
+    await b.routeWebSocket("**/socket.io/**", (socket) => socket.close());
+    const mobilePolling = b.waitForResponse(
+      (response) =>
+        response.url().includes("/socket.io/") &&
+        response.url().includes("transport=polling") &&
+        response.status() === 200,
+    );
     await register(a, names[0], "Альфа");
     await register(b, names[1], "Бета");
+    await mobilePolling;
     const secondUser = await db.user.findUniqueOrThrow({
       where: { username: names[1] },
     });
@@ -103,6 +112,35 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
     await b.reload();
     await expect(b.getByLabel("Сообщение", { exact: true })).toHaveValue(
       "Черновик после перезагрузки",
+    );
+    await b.getByLabel("Сообщение", { exact: true }).fill("");
+    await mobile.setOffline(true);
+    await expect(
+      b.getByRole("status").filter({ hasText: "Нет подключения к интернету" }),
+    ).toBeVisible();
+    await b
+      .getByLabel("Сообщение", { exact: true })
+      .fill("Отложенный черновик");
+    await expect(
+      b.getByRole("button", { name: "Отправить", exact: true }),
+    ).toBeDisabled();
+    await a
+      .getByLabel("Сообщение", { exact: true })
+      .fill("Сообщение после восстановления связи");
+    await a.getByRole("button", { name: "Отправить", exact: true }).click();
+    await expect(
+      a
+        .locator(".message-area")
+        .getByText("Сообщение после восстановления связи", { exact: true }),
+    ).toBeVisible();
+    await mobile.setOffline(false);
+    await expect(
+      b
+        .locator(".message-area")
+        .getByText("Сообщение после восстановления связи", { exact: true }),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(b.getByLabel("Сообщение", { exact: true })).toHaveValue(
+      "Отложенный черновик",
     );
     await b.getByLabel("Сообщение", { exact: true }).fill("");
     const image = await readFile(

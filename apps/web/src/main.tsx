@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -18,6 +19,7 @@ import { io, type Socket } from "socket.io-client";
 import {
   Store,
   ArrowLeft,
+  ArrowDown,
   ArrowRight,
   Check,
   ChevronRight,
@@ -113,6 +115,12 @@ import "./rooms.css";
 import "./panels.css";
 import "./collection-surfaces.css";
 import "./studio.css";
+import "./workspace.css";
+import {
+  useHistoryPosition,
+  useMobileChatViewport,
+  useSearchTerm,
+} from "./WorkspaceHistory";
 import { SettingsMenu, SettingsOverview } from "./SettingsMenu";
 initializePreferences();
 const Market = React.lazy(() =>
@@ -184,6 +192,8 @@ function Avatar({ user, size = "normal" }: { user: User; size?: string }) {
         <img
           src={`/api/users/${user.id}/media/avatar?v=${user.mediaVersion || 0}`}
           alt=""
+          loading="lazy"
+          decoding="async"
         />
       ) : (
         initials(user.name)
@@ -199,6 +209,8 @@ function ChatAvatar({ chat, user }: { chat: Chat; user: User }) {
       <img
         src={`/api/communities/${chat.id}/media/avatar?v=${chat.media.version}`}
         alt=""
+        loading="lazy"
+        decoding="async"
       />
     </div>
   );
@@ -269,7 +281,12 @@ function App() {
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
-  const end = useRef<HTMLDivElement>(null);
+  const settledPeopleSearch = useSearchTerm(search);
+  const settledMessageSearch = useSearchTerm(messageSearch);
+  const [connection, setConnection] = useState<
+    "online" | "offline" | "reconnecting"
+  >(navigator.onLine ? "online" : "offline");
+  useMobileChatViewport(!desktop && !!selected);
   const mainRef = useRef<HTMLElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const selectedRef = useRef<Chat | null>(null);
@@ -424,34 +441,75 @@ function App() {
     };
   }, [selected?.id, tab, profile?.id]);
   const users = useQuery({
-    queryKey: ["users", search],
-    queryFn: () =>
-      api<{ users: User[] }>("/users?q=" + encodeURIComponent(search)),
-    enabled: !!me.data && search.trim().length > 0,
+    queryKey: ["users", settledPeopleSearch],
+    queryFn: ({ signal }) =>
+      api<{ users: User[] }>(
+        "/users?q=" + encodeURIComponent(settledPeopleSearch),
+        { signal },
+      ),
+    enabled: !!me.data && !!settledPeopleSearch,
   });
   const messages = useInfiniteQuery({
-    queryKey: ["messages", selected?.id, messageSearch],
+    queryKey: ["messages", selected?.id, settledMessageSearch],
     initialPageParam: undefined as number | undefined,
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api<{ messages: Message[]; nextCursor: number | null }>(
-        `/chats/${selected!.id}/messages?q=${encodeURIComponent(messageSearch)}${pageParam ? "&before=" + pageParam : ""}`,
+        `/chats/${selected!.id}/messages?q=${encodeURIComponent(settledMessageSearch)}${pageParam ? "&before=" + pageParam : ""}`,
+        { signal },
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: !!selected && !!me.data,
   });
-  const allMessages =
-    messages.data?.pages
-      .slice()
-      .reverse()
-      .flatMap((page) => page.messages) || [];
+  const allMessages = useMemo(
+    () =>
+      messages.data?.pages
+        .slice()
+        .reverse()
+        .flatMap((page) => page.messages) ?? [],
+    [messages.data],
+  );
+  const messageGroups = useMemo(
+    () =>
+      allMessages.map((message, index) => ({
+        message,
+        newDay:
+          index === 0 ||
+          new Date(allMessages[index - 1].createdAt).toDateString() !==
+            new Date(message.createdAt).toDateString(),
+      })),
+    [allMessages],
+  );
+  const latestMessage = allMessages.at(-1);
+  const chatHistory = useHistoryPosition(
+    `${selected?.id || 0}:${settledMessageSearch}`,
+    !!settledMessageSearch,
+    allMessages[0]?.id,
+    latestMessage?.id,
+    latestMessage?.senderId === me.data?.user.id,
+  );
   useEffect(() => {
     if (!me.data) return;
-    const socket = io({ withCredentials: true, transports: ["websocket"] });
+    const socket = io({
+      withCredentials: true,
+      transports: ["polling", "websocket"],
+      tryAllTransports: true,
+    });
     socketRef.current = socket;
-    socket.on("connect", () =>
-      window.dispatchEvent(new Event("nimb-socket-ready")),
-    );
+    const updateConnection = () =>
+      setConnection(
+        !navigator.onLine
+          ? "offline"
+          : socket.connected
+            ? "online"
+            : "reconnecting",
+      );
+    socket.on("connect_error", updateConnection);
+    socket.on("disconnect", updateConnection);
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
     socket.on("connect", () => {
+      updateConnection();
+      window.dispatchEvent(new Event("nimb-socket-ready"));
       qc.invalidateQueries({ queryKey: ["chats"] });
       qc.invalidateQueries({ queryKey: ["messages"] });
       qc.invalidateQueries({ queryKey: ["gifts"] });
@@ -536,20 +594,13 @@ function App() {
       );
     return () => {
       socketRef.current = null;
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+      socket.removeAllListeners();
       socket.disconnect();
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, [me.data?.user.id, qc]);
-  useEffect(() => {
-    const area = end.current?.closest(".message-area");
-    const reducedMotion =
-      document.documentElement.dataset.reduceMotion === "true" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    area?.scrollTo({
-      top: area.scrollHeight,
-      behavior: reducedMotion ? "auto" : "smooth",
-    });
-  }, [messages.data?.pages[0]?.messages.at(-1)?.id, selected?.id]);
   useEffect(() => {
     if (!me.data) return;
     const url = new URL(location.href);
@@ -604,10 +655,10 @@ function App() {
     onError: (e) => setError(e.message),
   });
   const uploadFile = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, chatId }: { file: File; chatId: number }) => {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch(`/api/chats/${selected!.id}/files`, {
+      const response = await fetch(`/api/chats/${chatId}/files`, {
         method: "POST",
         credentials: "include",
         body,
@@ -617,8 +668,8 @@ function App() {
         throw new Error(data.error || "Не удалось загрузить файл");
       return data;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["messages", selected?.id] });
+    onSuccess: (_result, { chatId }) => {
+      qc.invalidateQueries({ queryKey: ["messages", chatId] });
       qc.invalidateQueries({ queryKey: ["chats"] });
     },
     onError: (e) => setError(e.message),
@@ -1095,7 +1146,8 @@ function App() {
                     <div className="list-section-label">
                       Люди · поиск по имени и @юзернейму
                     </div>
-                    {users.isLoading ? (
+                    {search.trim() !== settledPeopleSearch ||
+                    users.isLoading ? (
                       <p className="muted list-feedback">Поиск…</p>
                     ) : users.isError ? (
                       <p className="error">Не удалось выполнить поиск.</p>
@@ -1281,6 +1333,9 @@ function App() {
               </div>
             </section>
           )}
+          <div className="sidebar-sections sidebar-utilities">
+            <Nav tab={activeTab} nav={nav} placement="utility" />
+          </div>
           <footer className="sidebar-account">
             <button
               className="sidebar-profile"
@@ -1396,9 +1451,11 @@ function App() {
                           <UserName user={other} />
                         </strong>
                         <small>
-                          {currentChat?.kind === "direct"
-                            ? `@${other.username}${other.online === true ? " · в сети" : ""}`
-                            : `${currentChat?.kind === "channel" ? "Канал" : "Группа"} · ${currentChat?.members.length || 0} участников`}
+                          {typingChat === selected.id
+                            ? "Печатает…"
+                            : currentChat?.kind === "direct"
+                              ? `@${other.username}${other.online === true ? " · в сети" : ""}`
+                              : `${currentChat?.kind === "channel" ? "Канал" : "Группа"} · ${currentChat?.members.length || 0} участников`}
                         </small>
                       </span>
                     </button>
@@ -1438,8 +1495,12 @@ function App() {
                       </button>
                     </div>
                   </header>
-                  {typingChat === selected.id && (
-                    <div className="typing-indicator">Печатает…</div>
+                  {connection !== "online" && (
+                    <div className="thread-connection" role="status">
+                      {connection === "offline"
+                        ? "Нет подключения к интернету"
+                        : "Восстанавливаем связь…"}
+                    </div>
                   )}
                   {showMessageSearch && (
                     <div className="message-search">
@@ -1453,91 +1514,107 @@ function App() {
                       />
                     </div>
                   )}
-                  <div className="message-area">
-                    {messages.isError && (
-                      <div className="chat-load-error">
-                        Не удалось загрузить сообщения.{" "}
-                        <button onClick={() => messages.refetch()}>
-                          Повторить
-                        </button>
-                      </div>
-                    )}
-                    {!allMessages.length &&
-                      !messages.isLoading &&
-                      !messages.isError && (
-                        <div className="conversation-start">
-                          <MessageCircle size={30} strokeWidth={1.4} />
-                          <strong>Нет сообщений</strong>
-                          <small>Напишите первое сообщение</small>
+                  <div className="thread-history" key={selected.id}>
+                    <div
+                      className="message-area"
+                      ref={chatHistory.setViewport}
+                      onScroll={chatHistory.onScroll}
+                      aria-label="История сообщений"
+                    >
+                      {messages.isError && (
+                        <div className="chat-load-error">
+                          Не удалось загрузить сообщения.{" "}
+                          <button onClick={() => messages.refetch()}>
+                            Повторить
+                          </button>
                         </div>
                       )}
-                    {messages.isLoading && (
-                      <LoadingRows label="Загрузка сообщений…" count={4} />
-                    )}
-                    {messages.hasNextPage && (
-                      <button
-                        className="load-earlier"
-                        disabled={messages.isFetchingNextPage}
-                        onClick={() => messages.fetchNextPage()}
-                      >
-                        {messages.isFetchingNextPage
-                          ? "Загрузка…"
-                          : "Загрузить ранние сообщения"}
-                      </button>
-                    )}
-                    {allMessages.map((m, index) => (
-                      <React.Fragment key={m.id}>
-                        {(index === 0 ||
-                          new Date(
-                            allMessages[index - 1].createdAt,
-                          ).toDateString() !==
-                            new Date(m.createdAt).toDateString()) && (
-                          <div className="message-date">
-                            {new Date(m.createdAt).toLocaleDateString("ru-RU", {
-                              day: "numeric",
-                              month: "long",
-                            })}
+                      {!allMessages.length &&
+                        !messages.isLoading &&
+                        !messages.isError && (
+                          <div className="conversation-start">
+                            <MessageCircle size={30} strokeWidth={1.4} />
+                            <strong>Нет сообщений</strong>
+                            <small>Напишите первое сообщение</small>
                           </div>
                         )}
-                        <MessageBubble
-                          key={m.id}
-                          message={m}
-                          me={user.id}
-                          showViews={currentChat?.kind === "channel"}
-                          read={
-                            currentChat?.kind === "direct" &&
-                            !!currentChat.members.find(
-                              (member) =>
-                                member.user.id !== user.id &&
-                                member.lastReadId >= m.id,
-                            )
+                      {messages.isLoading && (
+                        <LoadingRows label="Загрузка сообщений…" count={4} />
+                      )}
+                      {messages.hasNextPage && (
+                        <button
+                          className="load-earlier"
+                          disabled={messages.isFetchingNextPage}
+                          onClick={() =>
+                            chatHistory.loadEarlier(messages.fetchNextPage)
                           }
-                          sender={
-                            currentChat?.kind !== "direct" &&
-                            m.senderId !== user.id
-                              ? currentChat?.members.find(
-                                  (member) => member.user.id === m.senderId,
-                                )?.user || "Участник"
-                              : undefined
-                          }
-                          canPin={
-                            currentChat?.kind === "direct" ||
-                            ["owner", "admin"].includes(
-                              currentChat?.members.find(
-                                (member) => member.user.id === user.id,
-                              )?.role || "",
-                            )
-                          }
-                          latest={
-                            index === allMessages.length - 1 && !messageSearch
-                          }
-                          onReply={setReplyTo}
-                          onForward={setForwardMessage}
-                          onError={setError}
-                        />
-                      </React.Fragment>
-                    ))}
-                    <div ref={end} />
+                        >
+                          {messages.isFetchingNextPage
+                            ? "Загрузка…"
+                            : "Загрузить ранние сообщения"}
+                        </button>
+                      )}
+                      {messageGroups.map(({ message: m, newDay }, index) => (
+                        <React.Fragment key={m.id}>
+                          {newDay && (
+                            <div className="message-date">
+                              {new Date(m.createdAt).toLocaleDateString(
+                                "ru-RU",
+                                {
+                                  day: "numeric",
+                                  month: "long",
+                                },
+                              )}
+                            </div>
+                          )}
+                          <MessageBubble
+                            key={m.id}
+                            message={m}
+                            me={user.id}
+                            showViews={currentChat?.kind === "channel"}
+                            read={
+                              currentChat?.kind === "direct" &&
+                              !!currentChat.members.find(
+                                (member) =>
+                                  member.user.id !== user.id &&
+                                  member.lastReadId >= m.id,
+                              )
+                            }
+                            sender={
+                              currentChat?.kind !== "direct" &&
+                              m.senderId !== user.id
+                                ? currentChat?.members.find(
+                                    (member) => member.user.id === m.senderId,
+                                  )?.user || "Участник"
+                                : undefined
+                            }
+                            canPin={
+                              currentChat?.kind === "direct" ||
+                              ["owner", "admin"].includes(
+                                currentChat?.members.find(
+                                  (member) => member.user.id === user.id,
+                                )?.role || "",
+                              )
+                            }
+                            latest={
+                              index === allMessages.length - 1 && !messageSearch
+                            }
+                            onReply={setReplyTo}
+                            onForward={setForwardMessage}
+                            onError={setError}
+                          />
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    {chatHistory.waiting && (
+                      <button
+                        className="history-jump"
+                        onClick={chatHistory.follow}
+                      >
+                        <ArrowDown size={16} aria-hidden="true" /> К новым
+                        сообщениям
+                      </button>
+                    )}
                   </div>
                   {currentChat?.kind === "channel" &&
                   currentChat.members.find((m) => m.user.id === user.id)
@@ -1562,7 +1639,11 @@ function App() {
                         className="composer"
                         onSubmit={(e) => {
                           e.preventDefault();
-                          if (text.trim() && !submitMessage.isPending)
+                          if (
+                            text.trim() &&
+                            !submitMessage.isPending &&
+                            connection !== "offline"
+                          )
                             submitMessage.mutate({
                               chatId: selected.id,
                               text,
@@ -1579,10 +1660,16 @@ function App() {
                             type="file"
                             aria-label="Прикрепить изображение или PDF"
                             accept="image/jpeg,image/png,image/webp,application/pdf"
-                            disabled={uploadFile.isPending}
+                            disabled={
+                              uploadFile.isPending || connection === "offline"
+                            }
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) uploadFile.mutate(file);
+                              if (file)
+                                uploadFile.mutate({
+                                  file,
+                                  chatId: selected.id,
+                                });
                               e.target.value = "";
                             }}
                           />
@@ -1689,10 +1776,21 @@ function App() {
                         </div>
                         <button
                           type="submit"
-                          disabled={!text.trim() || submitMessage.isPending}
+                          disabled={
+                            !text.trim() ||
+                            submitMessage.isPending ||
+                            connection === "offline"
+                          }
                           aria-label="Отправить"
                         >
-                          <Send size={19} />
+                          {submitMessage.isPending ? (
+                            <span
+                              className="send-progress"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Send size={19} />
+                          )}
                         </button>
                       </form>
                     </div>
@@ -1708,7 +1806,8 @@ function App() {
                     chat={currentChat ?? selected}
                     user={other}
                     messages={allMessages}
-                    searching={!!messageSearch}
+                    searching={!!settledMessageSearch}
+                    onSettings={() => setChatTools(true)}
                     onOpen={() =>
                       currentChat?.kind === "direct"
                         ? showProfile(other)
@@ -1827,7 +1926,7 @@ function App() {
         )}
       </main>
       <div className="mobile-nav" inert={!!profilePanel}>
-        <Nav tab={tab} nav={nav} mobile />
+        <Nav tab={tab} nav={nav} placement="mobile" />
       </div>
       {accountPanel && (
         <Dialog
@@ -2046,6 +2145,7 @@ function ConversationDetails({
   searching,
   onOpen,
   onClose,
+  onSettings,
 }: {
   chat: Chat;
   user: User;
@@ -2053,12 +2153,10 @@ function ConversationDetails({
   searching: boolean;
   onOpen: () => void;
   onClose: () => void;
+  onSettings: () => void;
 }) {
   const [view, setView] = useState<"files" | "gifts">("files");
-  const files = messages
-    .filter((message) => message.attachment)
-    .slice(-6)
-    .reverse();
+  const files = messages.filter((message) => message.attachment).reverse();
   return (
     <aside
       id="conversation-details"
@@ -2099,11 +2197,20 @@ function ConversationDetails({
         </span>
         <ChevronRight size={17} aria-hidden="true" />
       </button>
+      <button className="thread-settings" onClick={onSettings}>
+        <Settings size={17} aria-hidden="true" />
+        <span>Настройки диалога</span>
+        <ChevronRight size={15} aria-hidden="true" />
+      </button>
       {chat.kind !== "direct" && chat.description && (
         <p className="thread-description">{chat.description}</p>
       )}
       {chat.kind === "direct" && (
-        <div className="thread-panel-sections" aria-label="Содержимое чата">
+        <div
+          className="thread-panel-sections"
+          role="group"
+          aria-label="Содержимое чата"
+        >
           <button
             aria-pressed={view === "files"}
             onClick={() => setView("files")}
@@ -2162,12 +2269,13 @@ function ConversationDetails({
 function Nav({
   tab,
   nav,
-  mobile = false,
+  placement = "primary",
 }: {
   tab: string;
   nav: (t: string) => void;
-  mobile?: boolean;
+  placement?: "primary" | "utility" | "mobile";
 }) {
+  const mobile = placement === "mobile";
   const items = mobile
     ? [
         ["chats", "Чаты", MessagesSquare],
@@ -2176,17 +2284,25 @@ function Nav({
         ["profile", "Профиль", CircleUserRound],
         ["settings", "Настройки", Settings],
       ]
-    : [
-        ["chats", "Чаты", MessagesSquare],
-        ["feed", "Лента", AlignJustify],
-        ["market", "Маркет", Store],
-        ["wallet", "Кошелёк", WalletIcon],
-        ["saved", "Избранное", Bookmark],
-      ];
+    : placement === "utility"
+      ? [
+          ["wallet", "Кошелёк", WalletIcon],
+          ["saved", "Избранное", Bookmark],
+        ]
+      : [
+          ["chats", "Чаты", MessagesSquare],
+          ["feed", "Лента", AlignJustify],
+          ["market", "Маркет", Store],
+        ];
   return (
     <nav
-      id={mobile ? undefined : "desktop-sections"}
-      aria-label={mobile ? "Разделы" : "Разделы Nimb"}
+      aria-label={
+        mobile
+          ? "Разделы"
+          : placement === "utility"
+            ? "Кошелёк и избранное"
+            : "Разделы Nimb"
+      }
     >
       {items.map(([key, label, Icon]) => (
         <button
@@ -2261,6 +2377,7 @@ function Profile({
   }
   return (
     <div
+      data-personalized={!!((user.plus || user.id === 1) && user.profileAccent)}
       className={
         "profile accent-" +
         (user.plus || user.id === 1 ? user.profileAccent || "gold" : "gold") +
@@ -2378,7 +2495,12 @@ function Profile({
           {!own && actionsOpen && <ProfileActions user={user} />}
         </aside>
         <div className="profile-about">
-          <Collections userId={user.id} own={own} section="badges" />
+          <Collections
+            userId={user.id}
+            own={own}
+            section="badges"
+            identity={user}
+          />
           {user.hasMusic && <ProfileMusic user={user} own={own} />}
         </div>
         <section className="profile-collection">

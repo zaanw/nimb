@@ -1,23 +1,25 @@
 /* Nimb workspace design tokens and shared controls. */
 :root {
-  --frame: #11151c;
-  --bg: #181e27;
-  --surface: #222a36;
-  --raised: #2b3544;
-  --hover: #343f50;
-  --text: #f4f2f5;
-  --secondary: #c1c9d8;
-  --muted: #a0acc1;
-  --line: #b7cbef1c;
-  --line-strong: #c4d2f133;
-  --accent: #ffc9a3;
-  --link: #a9d7ec;
+  --frame: #090909;
+  --bg: #101010;
+  --surface: #141414;
+  --raised: #202020;
+  --hover: #252525;
+  --text: #f5f5f5;
+  --secondary: #b7b7b7;
+  --muted: #969696;
+  --line: #252525;
+  --line-strong: #353535;
+  --accent: #f0f0f0;
+  --accent-ink: #131313;
+  --focus: #e5e5e5;
+  --link: #dedede;
   --danger: #ff9fae;
-  --active-surface: #393237;
-  --dock: #202530;
-  --thread: #141921;
-  --online: #a0deca;
-  --sidebar-bg: #1b212b;
+  --active-surface: #262626;
+  --dock: #111111;
+  --thread: #0b0b0b;
+  --online: #d8d8d8;
+  --sidebar-bg: #0d0d0d;
   --sidebar-width: 280px;
   --space-1: 4px;
   --space-2: 8px;
@@ -32,6 +34,8 @@
   --text-message: 15px;
   --text-subhead: 16px;
   --text-title: 24px;
+  --motion-control: 150ms;
+  --motion-panel: 230ms;
   --studio-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -40,7 +44,7 @@ body {
 }
 ::selection {
   background: var(--accent);
-  color: #251522;
+  color: var(--accent-ink);
 }
 button:focus-visible,
 a:focus-visible,
@@ -48,7 +52,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible {
-  outline-color: var(--accent);
+  outline-color: var(--focus);
 }
 
 .studio-shell .main {
@@ -544,7 +548,7 @@ select:focus-visible,
   font-size: calc(var(--text-message) * var(--font-scale, 1));
 }
 .studio-shell .mine .bubble {
-  background: #2a3849;
+  background: #242424;
   border-radius: 12px 12px 3px 12px;
 }
 .studio-shell .bubble small {
@@ -571,7 +575,7 @@ select:focus-visible,
   border-radius: 8px;
 }
 .studio-shell .composer > button:last-child:not(:disabled) {
-  color: #311f26;
+  color: var(--accent-ink);
   background: var(--accent);
 }
 .studio-shell .composer > button:last-child:disabled {
@@ -638,7 +642,7 @@ select:focus-visible,
   justify-items: end;
   align-items: stretch;
   padding: 10px;
-  background: #080d178c;
+  background: #0009;
   backdrop-filter: none;
 }
 .workspace-dialog.profile-dialog,
@@ -649,7 +653,7 @@ select:focus-visible,
   border-radius: 13px;
   background: var(--bg);
   border-color: var(--line-strong);
-  animation: studio-sheet 190ms var(--studio-ease) both;
+  animation: studio-sheet var(--motion-panel) var(--studio-ease) both;
 }
 .workspace-dialog.settings-dialog {
   max-width: none;
