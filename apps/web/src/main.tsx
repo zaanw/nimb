@@ -6,6 +6,7 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import {
   QueryClient,
   QueryClientProvider,
@@ -26,7 +27,6 @@ import {
   Compass,
   LogOut,
   MessageCircle,
-  Paperclip,
   FileText,
   PanelRight,
   Plus,
@@ -53,6 +53,7 @@ import {
   Gift,
   MoreHorizontal,
   CalendarDays,
+  Copy,
   AlignJustify,
   MessagesSquare,
   CircleUserRound,
@@ -105,7 +106,7 @@ import { Admin } from "./Admin";
 import { InstallApp, useInstallApp } from "./InstallApp";
 import { Wallet } from "./Wallet";
 import { ChatTools, SavedMessages, usePersistentDrafts } from "./ChatExtras";
-import { ProfileIdentifiers } from "./ProfileIdentifiers";
+import { ProfileIdentifiers, formatNimbNumber } from "./ProfileIdentifiers";
 import { UserName, IdentitySettings, type Identity } from "./Identity";
 import "./theme.css";
 import "./quiet.css";
@@ -116,6 +117,7 @@ import "./panels.css";
 import "./collection-surfaces.css";
 import "./studio.css";
 import "./workspace.css";
+import "./nimb-2.css";
 import {
   useHistoryPosition,
   useMobileChatViewport,
@@ -160,6 +162,7 @@ type Chat = {
     archived?: boolean;
   }[];
   messages?: Message[];
+  unreadCount?: number;
 };
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch("/api" + path, {
@@ -272,6 +275,25 @@ function App() {
     "all",
   );
   const [chatTools, setChatTools] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [peopleSearchOpen, setPeopleSearchOpen] = useState(false);
+  const peopleSearch = useRef<HTMLInputElement>(null);
+  const peopleSearchTrigger = useRef<HTMLElement | null>(null);
+  const friends = useQuery({
+    queryKey: ["friends", me.data?.user.id],
+    queryFn: ({ signal }) => api<{ users: User[] }>("/friends", { signal }),
+    enabled: !!me.data && (friendsOpen || tab === "profile"),
+  });
+  function focusPeopleSearch() {
+    peopleSearchTrigger.current = document.activeElement as HTMLElement | null;
+    flushSync(() => setPeopleSearchOpen(true));
+    peopleSearch.current?.focus();
+  }
+  function closePeopleSearch() {
+    setSearch("");
+    setPeopleSearchOpen(false);
+    peopleSearchTrigger.current?.focus();
+  }
   const text = selected ? drafts[selected.id] || "" : "";
   function setText(value: string) {
     if (selected)
@@ -727,9 +749,11 @@ function App() {
   const ownPreferences = (chat: Chat) =>
     chat.members.find((m) => m.user.id === user.id);
   const isUnread = (chat: Chat) =>
-    !!chat.messages?.[0] &&
-    chat.messages[0].senderId !== user.id &&
-    chat.messages[0].id > (ownPreferences(chat)?.lastReadId || 0);
+    chat.unreadCount !== undefined
+      ? chat.unreadCount > 0
+      : !!chat.messages?.[0] &&
+        chat.messages[0].senderId !== user.id &&
+        chat.messages[0].id > (ownPreferences(chat)?.lastReadId || 0);
   const visibleChats = (chats.data?.chats || [])
     .filter(
       (chat) =>
@@ -774,6 +798,12 @@ function App() {
   const activeTab = accountPanel ? workspaceTab : tab;
   const profilePanel = desktop || selected ? profile : null;
   const workspaceBlocked = !!(accountPanel || profilePanel);
+  const profileDrawer = !!(profilePanel || (accountPanel && tab === "profile"));
+  const hasUnread = chats.data?.chats.some(isUnread);
+  function openSettingsSection(section: string) {
+    nav("settings");
+    setSetting(section);
+  }
 
   function nav(t: string, keepWorkspace = false) {
     const openingPanel = desktop && (t === "profile" || t === "settings");
@@ -791,6 +821,8 @@ function App() {
     if (!openingPanel && !keepWorkspace) {
       if (mainRef.current) mainRef.current.scrollTop = 0;
       setSearch("");
+      setPeopleSearchOpen(false);
+      setFriendsOpen(false);
       setReplyTo(null);
       setMessageSearch("");
       setShowMessageSearch(false);
@@ -835,6 +867,12 @@ function App() {
       onAdmin={() => nav("admin")}
       onMessage={() => {}}
       onEdit={() => setEditing(true)}
+      friendCount={friends.data?.users?.length}
+      onFriends={() => {
+        nav("chats", true);
+        setSearch("");
+        setFriendsOpen(true);
+      }}
     />
   );
   const settingsContent = (
@@ -945,7 +983,8 @@ function App() {
       className={
         "shell studio-shell " +
         (activeTab === "market" ? "market-open " : "") +
-        (messenger ? "messenger-shell" : "") +
+        (messenger ? "messenger-shell " : "") +
+        (profileDrawer ? "has-profile-drawer " : "") +
         (messenger && (selected || (!profilePanel && profile))
           ? " conversation-open"
           : "")
@@ -976,400 +1015,541 @@ function App() {
         }
       >
         <aside className="workspace-sidebar" aria-label="Боковая панель Nimb">
-          <header className="sidebar-top">
+          <div className="workspace-rail">
             <button
-              className="sidebar-brand"
+              className="sidebar-brand rail-brand"
               onClick={() => nav("chats")}
               aria-label="Nimb — на главную"
             >
-              <Brand />
+              <Brand markOnly />
             </button>
-            {messenger && (
+            <div className="sidebar-sections">
+              <Nav tab={activeTab} nav={nav} />
+            </div>
+            <div className="sidebar-sections sidebar-utilities">
+              <Nav tab={activeTab} nav={nav} placement="utility" />
+            </div>
+            <div className="rail-footer">
+              {me.data.isAdmin && (
+                <button
+                  className="icon-button"
+                  aria-label="Админ-панель"
+                  title="Админ-панель"
+                  aria-current={activeTab === "admin" ? "page" : undefined}
+                  onClick={() => nav("admin")}
+                >
+                  <Shield size={19} aria-hidden="true" />
+                </button>
+              )}
               <button
                 className="icon-button"
-                aria-label="Создать группу или канал"
-                title="Создать группу или канал"
-                onClick={() => setCommunityDialog(true)}
+                aria-label="Настройки"
+                title="Настройки"
+                onClick={() => nav("settings")}
               >
-                <Users size={19} aria-hidden="true" />
+                <Settings size={19} aria-hidden="true" />
               </button>
-            )}
-          </header>
-          <div className="sidebar-sections">
-            <Nav tab={activeTab} nav={nav} />
+            </div>
           </div>
-          {messenger && (
-            <section
-              id="chat-list"
-              tabIndex={-1}
-              className="conversation-list"
-              aria-label="Список чатов"
-            >
-              <header className="chats-heading">
-                <div>
-                  <h1>Чаты</h1>
-                </div>
-                <div className="chats-actions">
+          <div className="workspace-inbox">
+            <header className="sidebar-top">
+              {messenger ? (
+                <h1 className="workspace-name" aria-label="Чаты">
+                  Nimb
+                </h1>
+              ) : (
+                <span className="workspace-name">Nimb</span>
+              )}
+              {messenger && (
+                <div className="inbox-toolbar">
                   <button
-                    className="icon-button chat-saved-shortcut"
-                    aria-label="Открыть избранное"
-                    title="Избранное"
-                    onClick={() => nav("saved")}
+                    className="icon-button"
+                    aria-label="Найти пользователя"
+                    title="Поиск"
+                    onClick={focusPeopleSearch}
                   >
-                    <Bookmark size={18} aria-hidden="true" />
+                    <Search size={18} aria-hidden="true" />
                   </button>
                   <button
-                    className="icon-button mobile-create-group"
+                    className="icon-button inbox-notifications"
+                    aria-label="Уведомления"
+                    title="Уведомления"
+                    onClick={() => openSettingsSection("Уведомления")}
+                  >
+                    <Bell size={18} aria-hidden="true" />
+                    {hasUnread && <i aria-hidden="true" />}
+                  </button>
+                  <button
+                    className="icon-button inbox-create"
                     aria-label="Создать группу или канал"
                     title="Создать группу или канал"
                     onClick={() => setCommunityDialog(true)}
                   >
-                    <Users size={19} aria-hidden="true" />
-                  </button>
-                  <button
-                    className="icon-button compose-new"
-                    aria-label="Найти пользователя"
-                    title="Новое сообщение"
-                    onClick={() =>
-                      document.getElementById("people-search")?.focus()
-                    }
-                  >
-                    <SquarePen size={18} aria-hidden="true" />
+                    <Plus size={19} aria-hidden="true" />
                   </button>
                 </div>
-              </header>
-              <div className="search-box chats-search">
-                <Search size={17} />
-                <input
-                  id="people-search"
-                  maxLength={100}
-                  name="people-search"
-                  type="search"
-                  autoComplete="off"
-                  placeholder="Поиск"
-                  aria-label="Поиск людей и чатов"
-                  spellCheck={false}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    aria-label="Очистить поиск"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-              <div
-                className="chat-list-tabs"
-                hidden={!folders.data?.folders.length}
+              )}
+            </header>
+            {messenger && (
+              <section
+                id="chat-list"
+                tabIndex={-1}
+                className="conversation-list"
+                aria-label="Список чатов"
               >
-                <button
-                  className={!activeFolder ? "active" : ""}
-                  onClick={() => setActiveFolder(null)}
+                <header className="chats-heading">
+                  <div>
+                    <h1 aria-label="Чаты">Nimb</h1>
+                  </div>
+                  <div className="chats-actions">
+                    <button
+                      className="icon-button chat-saved-shortcut"
+                      aria-label="Открыть избранное"
+                      title="Избранное"
+                      onClick={() => nav("saved")}
+                    >
+                      <Bookmark size={18} aria-hidden="true" />
+                    </button>
+                    <button
+                      className="icon-button inbox-notifications mobile-notifications"
+                      aria-label="Уведомления"
+                      onClick={() => openSettingsSection("Уведомления")}
+                    >
+                      <Bell size={19} aria-hidden="true" />
+                      {hasUnread && <i aria-hidden="true" />}
+                    </button>
+                    <button
+                      className="icon-button mobile-create-group"
+                      aria-label="Создать группу или канал"
+                      title="Создать группу или канал"
+                      onClick={() => setCommunityDialog(true)}
+                    >
+                      <Plus size={20} aria-hidden="true" />
+                    </button>
+                    <button
+                      className="icon-button compose-new"
+                      aria-label="Найти пользователя"
+                      title="Новое сообщение"
+                      onClick={focusPeopleSearch}
+                    >
+                      <Search size={19} aria-hidden="true" />
+                    </button>
+                  </div>
+                </header>
+                <div
+                  className={
+                    "search-box chats-search" +
+                    (peopleSearchOpen ? " search-open" : "")
+                  }
                 >
-                  Все чаты
-                </button>
-                {folders.data?.folders.map((folder) => (
+                  <Search size={17} aria-hidden="true" />
+                  <input
+                    id="people-search"
+                    ref={peopleSearch}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Escape") return;
+                      closePeopleSearch();
+                    }}
+                    maxLength={100}
+                    name="people-search"
+                    type="search"
+                    autoComplete="off"
+                    placeholder="Поиск"
+                    aria-label="Поиск людей и чатов"
+                    spellCheck={false}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  {peopleSearchOpen && (
+                    <button
+                      onClick={closePeopleSearch}
+                      aria-label="Закрыть поиск людей"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                <div
+                  className="chat-list-tabs"
+                  hidden={!folders.data?.folders.length}
+                >
                   <button
-                    className={activeFolder === folder.id ? "active" : ""}
-                    key={folder.id}
-                    onClick={() => setActiveFolder(folder.id)}
+                    className={!activeFolder ? "active" : ""}
+                    onClick={() => setActiveFolder(null)}
                   >
-                    {folder.name}
+                    Все чаты
                   </button>
-                ))}
-              </div>
-              <div className="chat-filters" aria-label="Фильтр переписок">
-                {[
-                  ["all", "Все"],
-                  ["unread", "Непрочитанные"],
-                  ["archive", "Архив"],
-                ].map(([value, label]) => (
+                  {folders.data?.folders.map((folder) => (
+                    <button
+                      className={activeFolder === folder.id ? "active" : ""}
+                      key={folder.id}
+                      onClick={() => setActiveFolder(folder.id)}
+                    >
+                      {folder.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="chat-filters" aria-label="Раздел списка чатов">
                   <button
-                    key={value}
-                    className={chatFilter === value ? "active" : ""}
-                    aria-pressed={chatFilter === value}
-                    onClick={() => setChatFilter(value as typeof chatFilter)}
+                    className={!friendsOpen ? "active" : ""}
+                    aria-pressed={!friendsOpen && chatFilter === "all"}
+                    aria-label="Все"
+                    onClick={() => {
+                      setChatFilter("all");
+                      setFriendsOpen(false);
+                      setSearch("");
+                    }}
                   >
-                    {label}
+                    Чаты
                   </button>
-                ))}
-              </div>
-              <div className="chat-list-scroll">
-                {search.trim() ? (
-                  <>
-                    {matchingChats.length > 0 && (
-                      <>
-                        <div className="list-section-label">В ваших чатах</div>
-                        {matchingChats.map((chat) => {
-                          const person =
-                            chat.kind === "direct"
-                              ? chat.members.find(
-                                  (member) => member.user.id !== user.id,
-                                )?.user
-                              : {
-                                  id: 0,
-                                  name: chat.title,
-                                  username:
-                                    chat.kind === "channel"
-                                      ? "Канал"
-                                      : "Группа",
-                                  bio: "",
-                                  createdAt: "",
-                                };
-                          if (!person) return null;
-                          return (
-                            <button
-                              className="list-item"
-                              key={chat.id}
-                              onClick={() => selectChat(chat)}
-                            >
-                              <ChatAvatar chat={chat} user={person} />
-                              <span className="item-copy">
-                                <strong>
-                                  <UserName user={person} />
-                                </strong>
-                                <small>
-                                  {chat.kind === "direct"
-                                    ? "Личная переписка"
-                                    : person.username}
-                                </small>
-                              </span>
-                              <MessageCircle size={16} />
-                            </button>
-                          );
-                        })}
-                      </>
-                    )}
-                    <div className="list-section-label">
-                      Люди · поиск по имени и @юзернейму
-                    </div>
-                    {search.trim() !== settledPeopleSearch ||
-                    users.isLoading ? (
-                      <p className="muted list-feedback">Поиск…</p>
-                    ) : users.isError ? (
-                      <p className="error">Не удалось выполнить поиск.</p>
-                    ) : users.data?.users.length ? (
-                      users.data.users.map((u) => (
-                        <button
-                          className="list-item"
-                          key={u.id}
-                          onClick={() => {
-                            setSelected(null);
-                            showProfile(u);
-                          }}
-                        >
-                          <Avatar user={u} />
-                          <span className="item-copy">
-                            <strong>
-                              <UserName user={u} />
-                            </strong>
-                            <small>@{u.username}</small>
-                          </span>
-                          <ChevronRight size={16} />
-                        </button>
-                      ))
-                    ) : (
-                      <p className="muted list-feedback">
-                        Никого не нашли. Попробуйте другое имя.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="chat-shortcuts">
+                  <span className="inbox-tab-separator" aria-hidden="true" />
+                  <button
+                    className={friendsOpen ? "active" : ""}
+                    aria-pressed={friendsOpen}
+                    onClick={() => {
+                      setFriendsOpen(true);
+                      setSearch("");
+                      setPeopleSearchOpen(false);
+                    }}
+                  >
+                    Друзья
+                  </button>
+                  <div className="inbox-filter-actions" hidden={friendsOpen}>
+                    {(
+                      [
+                        ["unread", "Непрочитанные", Bell],
+                        ["archive", "Архив", Archive],
+                      ] as const
+                    ).map(([value, label, Icon]) => (
                       <button
-                        className="wallet-chat list-item"
-                        onClick={() => nav("wallet")}
+                        key={value}
+                        className={chatFilter === value ? "active" : ""}
+                        aria-pressed={chatFilter === value}
+                        aria-label={label}
+                        title={label}
+                        onClick={() => setChatFilter(value)}
                       >
-                        <span className="wallet-chat-avatar">
-                          <WalletIcon size={21} />
-                        </span>
-                        <span className="item-copy">
-                          <strong>Кошелёк</strong>
-                        </span>
-                        <ChevronRight size={15} />
+                        <Icon size={16} aria-hidden="true" />
                       </button>
-                      <button
-                        className="saved-chat list-item"
-                        onClick={() => nav("saved")}
-                      >
-                        <span className="saved-chat-avatar">
-                          <Bookmark size={20} />
-                        </span>
-                        <span className="item-copy">
-                          <strong>Избранное</strong>
-                        </span>
-                        <ChevronRight size={15} />
-                      </button>
-                    </div>
-                    {chats.isLoading ? (
-                      <LoadingRows label="Загружаем чаты…" count={5} />
-                    ) : chats.isError ? (
-                      <div className="list-feedback">
-                        <p className="error">Не удалось загрузить чаты.</p>
-                        <button
-                          className="outline"
-                          onClick={() => chats.refetch()}
-                        >
-                          Повторить
-                        </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="chat-list-scroll">
+                  {search.trim() ? (
+                    <>
+                      {matchingChats.length > 0 && (
+                        <>
+                          <div className="list-section-label">
+                            В ваших чатах
+                          </div>
+                          {matchingChats.map((chat) => {
+                            const person =
+                              chat.kind === "direct"
+                                ? chat.members.find(
+                                    (member) => member.user.id !== user.id,
+                                  )?.user
+                                : {
+                                    id: 0,
+                                    name: chat.title,
+                                    username:
+                                      chat.kind === "channel"
+                                        ? "Канал"
+                                        : "Группа",
+                                    bio: "",
+                                    createdAt: "",
+                                  };
+                            if (!person) return null;
+                            return (
+                              <button
+                                className="list-item"
+                                key={chat.id}
+                                onClick={() => selectChat(chat)}
+                              >
+                                <ChatAvatar chat={chat} user={person} />
+                                <span className="item-copy">
+                                  <strong>
+                                    <UserName user={person} />
+                                  </strong>
+                                  <small>
+                                    {chat.kind === "direct"
+                                      ? "Личная переписка"
+                                      : person.username}
+                                  </small>
+                                </span>
+                                <MessageCircle size={16} />
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
+                      <div className="list-section-label">
+                        Люди · поиск по имени и @юзернейму
                       </div>
-                    ) : visibleChats.length ? (
-                      visibleChats.map((c) => {
-                        const u =
-                          c.kind === "direct"
-                            ? c.members.find((m) => m.user.id !== user.id)?.user
-                            : {
-                                id: 0,
-                                name: c.title,
-                                username:
-                                  c.kind === "channel" ? "Канал" : "Группа",
-                                bio: "",
-                                createdAt: "",
-                              };
-                        if (!u) return null;
-                        const latest = c.messages?.[0];
-                        const ownMember = c.members.find(
-                          (m) => m.user.id === user.id,
-                        );
-                        const unread =
-                          !!latest &&
-                          latest.senderId !== user.id &&
-                          latest.id > (ownMember?.lastReadId || 0);
-                        return (
+                      {search.trim() !== settledPeopleSearch ||
+                      users.isLoading ? (
+                        <p className="muted list-feedback">Поиск…</p>
+                      ) : users.isError ? (
+                        <p className="error">Не удалось выполнить поиск.</p>
+                      ) : users.data?.users.length ? (
+                        users.data.users.map((u) => (
                           <button
-                            className={
-                              "list-item chat-list-item " +
-                              (selected?.id === c.id ? "selected" : "")
-                            }
-                            key={c.id}
-                            aria-current={
-                              selected?.id === c.id ? "true" : undefined
-                            }
-                            onClick={() => selectChat(c)}
+                            className="list-item"
+                            key={u.id}
+                            onClick={() => {
+                              setSelected(null);
+                              showProfile(u);
+                            }}
                           >
-                            <span className="avatar-wrap">
-                              <ChatAvatar chat={c} user={u} />
-                              {"online" in u && u.online === true && (
-                                <i className="presence-dot" />
-                              )}
-                            </span>
+                            <Avatar user={u} />
                             <span className="item-copy">
                               <strong>
                                 <UserName user={u} />
-                                {ownMember?.chatPinned && (
-                                  <Pin
-                                    className="chat-pin-indicator"
-                                    size={12}
-                                  />
-                                )}
                               </strong>
-                              <small>
-                                {drafts[c.id]
-                                  ? `Черновик: ${drafts[c.id]}`
-                                  : typingChat === c.id
-                                    ? "Печатает…"
-                                    : latest?.text ||
-                                      (latest?.attachment
-                                        ? "Вложение"
-                                        : "Нет сообщений")}
-                              </small>
+                              <small>@{u.username}</small>
                             </span>
-                            <span className="chat-item-meta">
-                              {latest?.createdAt && (
-                                <time>
-                                  {new Date(
-                                    latest.createdAt,
-                                  ).toLocaleTimeString("ru-RU", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </time>
-                              )}
-                              {unread && (
-                                <span
-                                  className="unread-dot"
-                                  aria-label="Есть непрочитанные сообщения"
-                                />
-                              )}
-                            </span>
+                            <ChevronRight size={16} />
                           </button>
-                        );
-                      })
-                    ) : (
-                      <div className="chat-list-empty">
-                        <MessagesSquare size={25} strokeWidth={1.5} />
-                        <strong>
-                          {activeFolder
-                            ? "В папке пока пусто"
-                            : chatFilter === "archive"
-                              ? "Архив пуст"
-                              : chatFilter === "unread"
-                                ? "Всё прочитано"
-                                : "Пока нет переписок"}
-                        </strong>
-                        <p>
-                          {chatFilter === "all"
-                            ? "Найдите человека по имени или @юзернейму."
-                            : chatFilter === "archive"
-                              ? "Здесь будут чаты, которые вы убрали в архив."
-                              : "Новые сообщения появятся здесь."}
+                        ))
+                      ) : (
+                        <p className="muted list-feedback">
+                          Никого не нашли. Попробуйте другое имя.
                         </p>
+                      )}
+                    </>
+                  ) : friendsOpen ? (
+                    <div className="inbox-friends">
+                      {friends.isPending ? (
+                        <LoadingRows label="Загружаем друзей…" />
+                      ) : friends.isError ? (
+                        <div className="list-feedback">
+                          <p className="error">Не удалось загрузить друзей.</p>
+                          <button
+                            className="outline"
+                            onClick={() => friends.refetch()}
+                          >
+                            Повторить
+                          </button>
+                        </div>
+                      ) : friends.data.users?.length ? (
+                        friends.data.users.map((friend) => (
+                          <button
+                            className="list-item"
+                            key={friend.id}
+                            onClick={() => {
+                              setSelected(null);
+                              showProfile(friend);
+                            }}
+                          >
+                            <Avatar user={friend} />
+                            <span className="item-copy">
+                              <strong>
+                                <UserName user={friend} />
+                              </strong>
+                              <small>@{friend.username}</small>
+                            </span>
+                            <ChevronRight size={15} aria-hidden="true" />
+                          </button>
+                        ))
+                      ) : (
+                        <p className="list-feedback muted">
+                          Здесь появятся люди, с которыми вы подписаны друг на
+                          друга.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="chat-shortcuts">
                         <button
-                          className="text-action"
-                          onClick={() =>
-                            document.getElementById("people-search")?.focus()
-                          }
+                          className="wallet-chat list-item"
+                          onClick={() => nav("wallet")}
                         >
-                          Найти человека <ArrowRight size={15} />
+                          <span className="wallet-chat-avatar">
+                            <WalletIcon size={21} />
+                          </span>
+                          <span className="item-copy">
+                            <strong>Кошелёк</strong>
+                          </span>
+                          <ChevronRight size={15} />
+                        </button>
+                        <button
+                          className="saved-chat list-item"
+                          onClick={() => nav("saved")}
+                        >
+                          <span className="saved-chat-avatar">
+                            <Bookmark size={20} />
+                          </span>
+                          <span className="item-copy">
+                            <strong>Избранное</strong>
+                          </span>
+                          <ChevronRight size={15} />
                         </button>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </section>
-          )}
-          <div className="sidebar-sections sidebar-utilities">
-            <Nav tab={activeTab} nav={nav} placement="utility" />
-          </div>
-          <footer className="sidebar-account">
-            <button
-              className="sidebar-profile"
-              aria-label="Мой профиль"
-              onClick={() => nav("profile")}
-            >
-              <Avatar user={user} />
-              <span>
-                <strong>
-                  <UserName user={user} />
-                </strong>
-                <small>@{user.username}</small>
-              </span>
-            </button>
-            {me.data.isAdmin && (
-              <button
-                className="icon-button"
-                aria-label="Админ-панель"
-                title="Админ-панель"
-                aria-current={activeTab === "admin" ? "page" : undefined}
-                onClick={() => nav("admin")}
-              >
-                <Shield size={18} aria-hidden="true" />
-              </button>
+                      {chats.isLoading ? (
+                        <LoadingRows label="Загружаем чаты…" count={5} />
+                      ) : chats.isError ? (
+                        <div className="list-feedback">
+                          <p className="error">Не удалось загрузить чаты.</p>
+                          <button
+                            className="outline"
+                            onClick={() => chats.refetch()}
+                          >
+                            Повторить
+                          </button>
+                        </div>
+                      ) : visibleChats.length ? (
+                        visibleChats.map((c) => {
+                          const u =
+                            c.kind === "direct"
+                              ? c.members.find((m) => m.user.id !== user.id)
+                                  ?.user
+                              : {
+                                  id: 0,
+                                  name: c.title,
+                                  username:
+                                    c.kind === "channel" ? "Канал" : "Группа",
+                                  bio: "",
+                                  createdAt: "",
+                                };
+                          if (!u) return null;
+                          const latest = c.messages?.[0];
+                          const ownMember = c.members.find(
+                            (m) => m.user.id === user.id,
+                          );
+                          const unread = isUnread(c);
+                          return (
+                            <button
+                              className={
+                                "list-item chat-list-item " +
+                                (selected?.id === c.id ? "selected" : "")
+                              }
+                              key={c.id}
+                              aria-current={
+                                selected?.id === c.id ? "true" : undefined
+                              }
+                              onClick={() => selectChat(c)}
+                            >
+                              <span className="avatar-wrap">
+                                <ChatAvatar chat={c} user={u} />
+                                {"online" in u && u.online === true && (
+                                  <i className="presence-dot" />
+                                )}
+                              </span>
+                              <span className="item-copy">
+                                <strong>
+                                  <UserName user={u} />
+                                </strong>
+                                <small>
+                                  {drafts[c.id]
+                                    ? `Черновик: ${drafts[c.id]}`
+                                    : typingChat === c.id
+                                      ? "Печатает…"
+                                      : latest?.text ||
+                                        (latest?.attachment
+                                          ? "Вложение"
+                                          : "Нет сообщений")}
+                                </small>
+                              </span>
+                              <span className="chat-item-meta">
+                                {latest?.createdAt && (
+                                  <time>
+                                    {new Date(
+                                      latest.createdAt,
+                                    ).toLocaleTimeString("ru-RU", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </time>
+                                )}
+                                {ownMember?.chatPinned && (
+                                  <Pin
+                                    size={12}
+                                    aria-label="Закреплённый чат"
+                                  />
+                                )}
+                                {unread && (
+                                  <span
+                                    className={
+                                      c.unreadCount
+                                        ? "unread-count"
+                                        : "unread-dot"
+                                    }
+                                    aria-label={
+                                      c.unreadCount
+                                        ? `Непрочитанных: ${c.unreadCount}`
+                                        : "Есть непрочитанные сообщения"
+                                    }
+                                  >
+                                    {c.unreadCount
+                                      ? Math.min(c.unreadCount, 99) +
+                                        (c.unreadCount > 99 ? "+" : "")
+                                      : null}
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="chat-list-empty">
+                          <MessagesSquare size={25} strokeWidth={1.5} />
+                          <strong>
+                            {activeFolder
+                              ? "В папке пока пусто"
+                              : chatFilter === "archive"
+                                ? "Архив пуст"
+                                : chatFilter === "unread"
+                                  ? "Всё прочитано"
+                                  : "Пока нет переписок"}
+                          </strong>
+                          <p>
+                            {chatFilter === "all"
+                              ? "Найдите человека по имени или @юзернейму."
+                              : chatFilter === "archive"
+                                ? "Здесь будут чаты, которые вы убрали в архив."
+                                : "Новые сообщения появятся здесь."}
+                          </p>
+                          <button
+                            className="text-action"
+                            onClick={focusPeopleSearch}
+                          >
+                            Найти человека <ArrowRight size={15} />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </section>
             )}
-            <button
-              className="icon-button"
-              aria-label="Настройки"
-              title="Настройки"
-              onClick={() => nav("settings")}
-            >
-              <Settings size={18} aria-hidden="true" />
-            </button>
-          </footer>
+            <footer className="sidebar-account">
+              <button
+                type="button"
+                className="sidebar-plus"
+                onClick={() => openSettingsSection("nimb Plus")}
+              >
+                <Sparkles size={19} aria-hidden="true" />
+                <span>
+                  <strong>Nimb Plus</strong>
+                  <small>Персонализация профиля</small>
+                </span>
+                <ChevronRight size={15} aria-hidden="true" />
+              </button>
+              <button
+                className="sidebar-profile"
+                aria-label="Мой профиль"
+                onClick={() => nav("profile")}
+              >
+                <Avatar user={user} />
+                <span>
+                  <strong>
+                    <UserName user={user} />
+                  </strong>
+                  <small>@{user.username}</small>
+                </span>
+              </button>
+            </footer>
+          </div>
         </aside>
         <AnimatePresence mode="wait">
           <motion.div
@@ -1454,7 +1634,9 @@ function App() {
                           {typingChat === selected.id
                             ? "Печатает…"
                             : currentChat?.kind === "direct"
-                              ? `@${other.username}${other.online === true ? " · в сети" : ""}`
+                              ? other.online === true
+                                ? "В сети"
+                                : `@${other.username}`
                               : `${currentChat?.kind === "channel" ? "Канал" : "Группа"} · ${currentChat?.members.length || 0} участников`}
                         </small>
                       </span>
@@ -1558,13 +1740,13 @@ function App() {
                         <React.Fragment key={m.id}>
                           {newDay && (
                             <div className="message-date">
-                              {new Date(m.createdAt).toLocaleDateString(
-                                "ru-RU",
-                                {
-                                  day: "numeric",
-                                  month: "long",
-                                },
-                              )}
+                              {new Date(m.createdAt).toDateString() ===
+                              new Date().toDateString()
+                                ? "Сегодня"
+                                : new Date(m.createdAt).toLocaleDateString(
+                                    "ru-RU",
+                                    { day: "numeric", month: "long" },
+                                  )}
                             </div>
                           )}
                           <MessageBubble
@@ -1655,7 +1837,7 @@ function App() {
                           className="attach-button"
                           title="Прикрепить изображение или PDF"
                         >
-                          <Paperclip size={19} />
+                          <Plus size={21} aria-hidden="true" />
                           <input
                             type="file"
                             aria-label="Прикрепить изображение или PDF"
@@ -1698,7 +1880,7 @@ function App() {
                           }}
                           name="message"
                           autoComplete="off"
-                          placeholder="Написать сообщение…"
+                          placeholder="Сообщение…"
                           aria-label="Сообщение"
                         />
                         <div
@@ -1840,12 +2022,7 @@ function App() {
                         ? "Непрочитанные"
                         : "Переписки"}
                   </h2>
-                  <button
-                    className="outline"
-                    onClick={() =>
-                      document.getElementById("people-search")?.focus()
-                    }
-                  >
+                  <button className="outline" onClick={focusPeopleSearch}>
                     <SquarePen size={16} aria-hidden="true" /> Новое сообщение
                   </button>
                 </header>
@@ -1938,6 +2115,7 @@ function App() {
               : "settings-dialog workspace-dialog"
           }
           showTitle={false}
+          backButton={tab === "profile"}
           onClose={() => {
             nav(workspaceTab, true);
             requestAnimationFrame(() => workspaceTrigger.current?.focus());
@@ -1951,6 +2129,7 @@ function App() {
           title={profilePanel.name}
           className="profile-dialog workspace-dialog"
           showTitle={false}
+          backButton
           onClose={closeProfile}
         >
           <Profile
@@ -2335,6 +2514,8 @@ function Profile({
   onEdit,
   isAdmin = false,
   onAdmin,
+  friendCount,
+  onFriends,
 }: {
   user: User;
   own: boolean;
@@ -2342,6 +2523,8 @@ function Profile({
   onEdit: () => void;
   isAdmin?: boolean;
   onAdmin?: () => void;
+  friendCount?: number;
+  onFriends?: () => void;
 }) {
   const fetched = useQuery({
     queryKey: ["profile", initial.id],
@@ -2355,6 +2538,11 @@ function Profile({
   const [shareNotice, setShareNotice] = useState("");
   const [actionsOpen, setActionsOpen] = useState(false);
   const detailsHeading = useRef<HTMLHeadingElement>(null);
+  const profileMenu = useRef<HTMLDetailsElement>(null);
+  function showContacts() {
+    detailsHeading.current?.focus({ preventScroll: true });
+    detailsHeading.current?.scrollIntoView({ block: "start" });
+  }
   async function share() {
     const url = new URL(location.href);
     url.search = "";
@@ -2389,17 +2577,40 @@ function Profile({
         title={own ? "Мой профиль" : "Профиль"}
         action={
           <div className="profile-heading-tools">
+            <details
+              className="profile-actions-menu"
+              ref={profileMenu}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || !event.currentTarget.open) return;
+                event.stopPropagation();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
+              }}
+            >
+              <summary aria-label="Действия профиля">
+                <MoreHorizontal size={21} aria-hidden="true" />
+              </summary>
+              <button
+                type="button"
+                onClick={() => {
+                  if (profileMenu.current) profileMenu.current.open = false;
+                  void share();
+                }}
+              >
+                <Share2 size={16} aria-hidden="true" /> Поделиться
+              </button>
+            </details>
             <button
-              className="icon-button"
+              className="icon-button profile-mobile-action"
               aria-label="Поделиться"
               title="Поделиться"
               onClick={share}
             >
-              <Share2 size={16} aria-hidden="true" />
+              <Share2 size={18} aria-hidden="true" />
             </button>
             {own && (
               <button
-                className="icon-button"
+                className="icon-button profile-mobile-action"
                 aria-label="Редактировать"
                 title="Редактировать"
                 onClick={onEdit}
@@ -2425,7 +2636,18 @@ function Profile({
                     }
                   : undefined
               }
-            />
+            >
+              {own && (
+                <button
+                  type="button"
+                  className="icon-button profile-cover-edit"
+                  aria-label="Редактировать баннер"
+                  onClick={onEdit}
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                </button>
+              )}
+            </div>
             <div className="profile-overview">
               <div className="profile-hero">
                 <div className="profile-identity">
@@ -2434,7 +2656,23 @@ function Profile({
                     <h2>
                       <UserName user={user} />
                     </h2>
-                    <span>@{user.username}</span>
+                    <button
+                      type="button"
+                      className="profile-copy-handle"
+                      aria-label="Скопировать юзернейм"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(
+                            "@" + user.username,
+                          );
+                          setShareNotice("Юзернейм скопирован");
+                        } catch {
+                          setShareNotice("Не удалось скопировать юзернейм");
+                        }
+                      }}
+                    >
+                      @{user.username} <Copy size={15} aria-hidden="true" />
+                    </button>
                     {user.online !== undefined && user.online !== null && (
                       <small className="profile-status">
                         {user.online ? "В сети" : "Не в сети"}
@@ -2442,12 +2680,7 @@ function Profile({
                     )}
                     <button
                       className="profile-contact-link"
-                      onClick={() => {
-                        detailsHeading.current?.focus({ preventScroll: true });
-                        detailsHeading.current?.scrollIntoView({
-                          block: "start",
-                        });
-                      }}
+                      onClick={showContacts}
                     >
                       Контакты <ArrowRight size={13} aria-hidden="true" />
                     </button>
@@ -2478,12 +2711,6 @@ function Profile({
                     </div>
                   )}
                 </div>
-                {user.bio && <p className="profile-bio">{user.bio}</p>}
-                {user.bioPrivate && !own && (
-                  <p className="muted profile-bio">
-                    Описание скрыто владельцем.
-                  </p>
-                )}
               </div>
             </div>
           </section>
@@ -2503,6 +2730,38 @@ function Profile({
           />
           {user.hasMusic && <ProfileMusic user={user} own={own} />}
         </div>
+        <div className="profile-facts">
+          {(user.bio || (user.bioPrivate && !own)) && (
+            <div className="profile-description">
+              <Info size={16} aria-hidden="true" />
+              {user.bio && <p className="profile-bio">{user.bio}</p>}
+              {user.bioPrivate && !own && (
+                <p className="muted profile-bio">Описание скрыто владельцем.</p>
+              )}
+            </div>
+          )}
+          <p className="profile-registration">
+            <CalendarDays size={16} aria-hidden="true" />
+            <span>Регистрация: {date(user.createdAt)}</span>
+          </p>
+          {friendCount !== undefined && (
+            <button className="profile-friend-count" onClick={onFriends}>
+              <Users size={16} aria-hidden="true" />
+              Друзья: {friendCount}
+            </button>
+          )}
+          {user.collectibleNumber && (
+            <button className="profile-friend-count" onClick={showContacts}>
+              <Hash size={16} aria-hidden="true" />
+              Номер Nimb: {formatNimbNumber(user.collectibleNumber)}
+            </button>
+          )}
+        </div>
+        {own && (
+          <button className="outline profile-edit-action" onClick={onEdit}>
+            <Pencil size={16} aria-hidden="true" /> Редактировать профиль
+          </button>
+        )}
         <section className="profile-collection">
           <div
             className="profile-tabs"
@@ -2546,9 +2805,6 @@ function Profile({
           <div className="profile-meta">
             <span>
               <Hash size={15} /> ID {user.id}
-            </span>
-            <span>
-              <CalendarDays size={15} /> С {date(user.createdAt)}
             </span>
           </div>
         </div>

@@ -6,25 +6,27 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 
 export function Brand({ markOnly = false }: { markOnly?: boolean }) {
   return (
     <span className="brand">
       <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <path
-          d="M7 25V8.5M7 17c0-6 3-9 8-9s8 3 8 8v9"
+          d="M7 24V9c0-1.4 1.7-2.1 2.7-1.1l12.6 15.2"
           stroke="currentColor"
           strokeWidth="4.5"
           strokeLinecap="round"
+          strokeLinejoin="round"
         />
-        <circle cx="27.5" cy="5" r="2" fill="currentColor" />
+        <path
+          d="m13 12 9.3 11.1A1.55 1.55 0 0 0 25 22V7"
+          stroke="var(--accent, #dac9f2)"
+          strokeWidth="4.5"
+          strokeLinecap="round"
+        />
       </svg>
-      {!markOnly && (
-        <span>
-          nimb<span className="brand-period">.</span>
-        </span>
-      )}
+      {!markOnly && <span>Nimb</span>}
     </span>
   );
 }
@@ -71,12 +73,14 @@ export function Dialog({
   onClose,
   className = "",
   showTitle = true,
+  backButton = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   className?: string;
   showTitle?: boolean;
+  backButton?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -137,11 +141,15 @@ export function Dialog({
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          className="icon-button close"
+          className={"icon-button close" + (backButton ? " back-close" : "")}
           aria-label="Закрыть"
           onClick={onClose}
         >
-          <X size={20} />
+          {backButton ? (
+            <ArrowLeft size={20} aria-hidden="true" />
+          ) : (
+            <X size={20} aria-hidden="true" />
+          )}
         </button>
         {showTitle && <h2>{title}</h2>}
         {children}

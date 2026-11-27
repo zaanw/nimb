@@ -265,7 +265,12 @@ function ProfileBadge({ badge, onOpen }: { badge: Badge; onOpen: () => void }) {
         }
       }}
     >
-      <button className="badge-token" aria-describedby={hint} onClick={onOpen}>
+      <button
+        className="badge-token"
+        data-badge-id={badge.id}
+        aria-describedby={hint}
+        onClick={onOpen}
+      >
         <BadgeIcon id={badge.id} size={16} />
         <span>{badge.name}</span>
       </button>

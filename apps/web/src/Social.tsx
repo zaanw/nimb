@@ -495,6 +495,7 @@ export function ProfileActions({ user }: { user: User }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["follows"] });
       qc.invalidateQueries({ queryKey: ["blocks"] });
+      qc.invalidateQueries({ queryKey: ["friends"] });
       qc.invalidateQueries({ queryKey: ["posts"] });
     },
   });

@@ -285,29 +285,6 @@
     font-size: 20px;
   }
 }
-@media (min-width: 1050px) {
-  .workspace-dialog.profile-dialog {
-    width: min(696px, 100%);
-  }
-  .profile-dialog .profile-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(182px, 210px);
-    column-gap: 22px;
-  }
-  .profile-dialog
-    .profile-layout
-    > :is(.profile-summary, .profile-about, .profile-admin-link) {
-    grid-column: 1 / -1;
-  }
-  .profile-dialog .profile-layout > .profile-collection {
-    grid-column: 1;
-  }
-  .profile-dialog .profile-layout > .profile-details {
-    grid-column: 2;
-  }
-  .profile-dialog .profile-details .profile-meta {
-    display: grid;
-  }
-}
 @media (max-width: 760px) {
   .studio-shell.conversation-open .chat-workspace,
   .studio-shell.conversation-open .conversation-screen {

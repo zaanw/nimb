@@ -1,9 +1,9 @@
 /* Profile and settings share the workspace's graphite palette. */
 .workspace-dialog {
-  --panel-ink: #f0f0f3;
-  --panel-muted: #a5a5af;
-  --panel-edge: #ffffff1a;
-  --panel-highlight: #aabfe9;
+  --panel-ink: var(--text);
+  --panel-muted: var(--muted);
+  --panel-edge: var(--line-strong);
+  --panel-highlight: var(--accent);
 }
 
 .overlay:has(> .settings-dialog) {

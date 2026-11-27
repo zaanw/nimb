@@ -122,7 +122,10 @@ test("all primary screens fit the five release widths, with screenshots and keyb
       }
       if (file === "profile") {
         await expect(
-          page.getByRole("button", { name: "Редактировать", exact: true }),
+          page.getByRole("button", {
+            name: width >= 1190 ? "Редактировать профиль" : "Редактировать",
+            exact: true,
+          }),
         ).toBeVisible();
         if (width > 760) {
           const dialog = page.getByRole("dialog", {

@@ -71,6 +71,36 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
     const secondUser = await db.user.findUniqueOrThrow({
       where: { username: names[1] },
     });
+    const firstUser = await db.user.findUniqueOrThrow({
+      where: { username: names[0] },
+    });
+    const origin = new URL(a.url()).origin;
+    const headers = { Origin: origin };
+    const firstFollow = await a.request.post(
+      `/api/users/${secondUser.id}/follow`,
+      {
+        headers,
+      },
+    );
+    expect(firstFollow.ok()).toBe(true);
+    expect((await (await a.request.get("/api/friends")).json()).users).toEqual(
+      [],
+    );
+    const secondFollow = await b.request.post(
+      `/api/users/${firstUser.id}/follow`,
+      {
+        headers,
+      },
+    );
+    expect(secondFollow.ok()).toBe(true);
+    await a.getByRole("button", { name: "Друзья", exact: true }).click();
+    await expect(
+      a.locator(".inbox-friends").getByRole("button", { name: /Бета/ }),
+    ).toBeVisible();
+    await a
+      .locator(".chat-filters")
+      .getByRole("button", { name: "Все", exact: true })
+      .click();
     const guest = await browser.newContext();
     try {
       const visitor = await guest.newPage();
@@ -96,8 +126,9 @@ test("real accounts register, log in, exchange messages and attachments, edit a 
       .getByLabel("Сообщение", { exact: true })
       .fill("Привет с компьютера");
     await a.getByRole("button", { name: "Отправить", exact: true }).click();
-    await expect(b.getByRole("button", { name: /Альфа/ })).toBeVisible();
-    await b.getByRole("button", { name: /Альфа/ }).click();
+    const incoming = b.locator(".chat-list-item").filter({ hasText: "Альфа" });
+    await expect(incoming.locator(".unread-count")).toHaveText("1");
+    await incoming.click();
     await expect(
       b.getByText("Привет с компьютера", { exact: true }),
     ).toBeVisible();

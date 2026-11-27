@@ -2,7 +2,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { UserName, type Identity } from "./Identity";
 import { motion } from "framer-motion";
 import { memo, useEffect, useRef, useState } from "react";
-import { MoreHorizontal, Check, CheckCheck, Pin, Eye } from "lucide-react";
+import {
+  MoreHorizontal,
+  Check,
+  CheckCheck,
+  Pin,
+  Eye,
+  FileText,
+} from "lucide-react";
 import { useConfirmation } from "./UI";
 export type Message = {
   id: number;
@@ -180,8 +187,16 @@ export const MessageBubble = memo(function MessageBubble({
                 decoding="async"
               />
             )}
-            <span>
-              {m.attachment.name} · {(m.attachment.size / 1024).toFixed(0)} КБ
+            <span className="attachment-caption">
+              <span className="attachment-icon">
+                <FileText size={16} aria-hidden="true" />
+              </span>
+              <span>
+                <strong>{m.attachment.name}</strong>
+                <small>
+                  {Math.max(1, Math.round(m.attachment.size / 1024))} КБ
+                </small>
+              </span>
             </span>
           </a>
         ) : (
