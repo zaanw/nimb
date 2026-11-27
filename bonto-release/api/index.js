@@ -464,8 +464,34 @@ app.post('/api/chats', async (req, reply) => { const s = await auth(req, reply);
     return reply.code(400).send({ error: 'Нельзя создать чат с собой' }); if (!await db.user.findUnique({ where: { id: userId } }))
     return reply.code(404).send({ error: 'Пользователь не найден' }); if (!await canDirectMessage(s.userId, userId))
     return reply.code(403).send({ error: 'Общение с пользователем недоступно' }); const pairKey = [s.userId, userId].sort((a, b) => a - b).join(':'); const chat = await db.chat.upsert({ where: { pairKey }, update: {}, create: { pairKey, members: { create: [{ userId: s.userId }, { userId }] } }, include: { members: { include: { user: { select: publicUser } } }, media: { select: { hasAvatar: true, hasBanner: true, version: true } } } }); return { chat }; });
-app.get('/api/chats', async (req, reply) => { const s = await auth(req, reply); if (!s)
-    return; const chats = await db.chat.findMany({ where: { members: { some: { userId: s.userId } } }, include: { members: { include: { user: { select: publicUser } } }, media: { select: { hasAvatar: true, hasBanner: true, version: true } }, messages: { orderBy: { id: 'desc' }, take: 1 } }, orderBy: { id: 'desc' } }); return { chats }; });
+app.get('/api/chats', async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const chats = await db.chat.findMany({
+        where: { members: { some: { userId: s.userId } } },
+        include: {
+            members: { include: { user: { select: publicUser } } },
+            media: { select: { hasAvatar: true, hasBanner: true, version: true } },
+            messages: { orderBy: { id: 'desc' }, take: 1 },
+        },
+        orderBy: { id: 'desc' },
+    });
+    if (!chats.length)
+        return { chats };
+    const counts = await db.$queryRaw `
+    SELECT member."chatId", COUNT(*)::integer AS "unreadCount"
+    FROM "Member" AS member
+    JOIN "Message" AS message
+      ON message."chatId" = member."chatId"
+      AND message.id > member."lastReadId"
+      AND message."senderId" <> member."userId"
+    WHERE member."userId" = ${s.userId}
+    GROUP BY member."chatId"
+  `;
+    const unread = new Map(counts.map(({ chatId, unreadCount }) => [chatId, unreadCount]));
+    return { chats: chats.map(chat => ({ ...chat, unreadCount: unread.get(chat.id) ?? 0 })) };
+});
 async function member(chatId, userId) { return db.member.findUnique({ where: { chatId_userId: { chatId, userId } } }); }
 app.get('/api/chats/:id/messages', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = z.coerce.number().int().positive().parse(req.params.id); if (!await member(id, s.userId))
@@ -543,6 +569,25 @@ app.post('/api/users/:id/report', { config: { rateLimit: { max: 10, timeWindow: 
     return reply.code(404).send({ error: 'Пользователь не найден' }); await db.report.create({ data: { reporterId: s.userId, reportedId: id, reason } }); return { ok: true }; });
 app.get('/api/follows', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; return { ids: (await db.follow.findMany({ where: { followerId: s.userId }, select: { followingId: true } })).map(x => x.followingId) }; });
+app.get('/api/friends', async (req, reply) => {
+    const s = await auth(req, reply);
+    if (!s)
+        return;
+    const excluded = await blockedIds(s.userId);
+    const mutual = await db.follow.findMany({
+        where: {
+            followerId: s.userId,
+            followingId: { notIn: excluded },
+            following: {
+                suspended: false,
+                following: { some: { followingId: s.userId } },
+            },
+        },
+        select: { following: { select: publicUser } },
+        orderBy: { followingId: 'asc' },
+    });
+    return { users: mutual.map(row => row.following) };
+});
 app.post('/api/users/:id/follow', async (req, reply) => { const s = await auth(req, reply); if (!s)
     return; const id = intId(req.params.id); if (id === s.userId)
     return reply.code(400).send({ error: 'Нельзя подписаться на себя' }); if (!await db.user.findUnique({ where: { id } }) || await blocked(s.userId, id))

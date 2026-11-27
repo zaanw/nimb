@@ -246,7 +246,32 @@ app.get('/api/users/:id/music',async(req,reply)=>{const s=await auth(req,reply);
 app.get('/api/users',async(req,reply)=>{const s=await auth(req,reply);if(!s)return; const {q}=z.object({q:z.string().trim().min(1).max(50)}).parse(req.query);const term=q.startsWith('@')?q.slice(1).trim():q;if(!term)return {users:[]};return {users:await db.user.findMany({where:{id:{not:s.userId},OR:[{username:{contains:term.toLowerCase()}},{purchasedUsernames:{some:{public:true,username:{contains:term.toLowerCase()}}}},{collectibleNumber:{contains:term}},{name:{contains:term,mode:'insensitive'}}]},select:publicUser,take:20})};});
 app.get('/api/users/:id',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const user=await db.user.findUnique({where:{id},select:publicUser});if(!user)return reply.code(404).send({error:'Пользователь не найден'});return {user};});
 app.post('/api/chats',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const {userId}=z.object({userId:z.number().int().positive()}).parse(req.body);if(userId===s.userId)return reply.code(400).send({error:'Нельзя создать чат с собой'});if(!await db.user.findUnique({where:{id:userId}}))return reply.code(404).send({error:'Пользователь не найден'});if(!await canDirectMessage(s.userId,userId))return reply.code(403).send({error:'Общение с пользователем недоступно'});const pairKey=[s.userId,userId].sort((a,b)=>a-b).join(':'); const chat=await db.chat.upsert({where:{pairKey},update:{},create:{pairKey,members:{create:[{userId:s.userId},{userId}]}},include:{members:{include:{user:{select:publicUser}}},media:{select:{hasAvatar:true,hasBanner:true,version:true}}}});return {chat};});
-app.get('/api/chats',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const chats=await db.chat.findMany({where:{members:{some:{userId:s.userId}}},include:{members:{include:{user:{select:publicUser}}},media:{select:{hasAvatar:true,hasBanner:true,version:true}},messages:{orderBy:{id:'desc'},take:1}},orderBy:{id:'desc'}});return {chats};});
+app.get('/api/chats', async (req, reply) => {
+  const s = await auth(req, reply);
+  if (!s) return;
+  const chats = await db.chat.findMany({
+    where: {members: {some: {userId: s.userId}}},
+    include: {
+      members: {include: {user: {select: publicUser}}},
+      media: {select: {hasAvatar: true, hasBanner: true, version: true}},
+      messages: {orderBy: {id: 'desc'}, take: 1},
+    },
+    orderBy: {id: 'desc'},
+  });
+  if (!chats.length) return {chats};
+  const counts = await db.$queryRaw<{chatId: number; unreadCount: number}[]>`
+    SELECT member."chatId", COUNT(*)::integer AS "unreadCount"
+    FROM "Member" AS member
+    JOIN "Message" AS message
+      ON message."chatId" = member."chatId"
+      AND message.id > member."lastReadId"
+      AND message."senderId" <> member."userId"
+    WHERE member."userId" = ${s.userId}
+    GROUP BY member."chatId"
+  `;
+  const unread = new Map(counts.map(({chatId, unreadCount}) => [chatId, unreadCount]));
+  return {chats: chats.map(chat => ({...chat, unreadCount: unread.get(chat.id) ?? 0}))};
+});
 async function member(chatId:number,userId:number){return db.member.findUnique({where:{chatId_userId:{chatId,userId}}});}
 app.get('/api/chats/:id/messages',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);if(!await member(id,s.userId))return reply.code(404).send({error:'Чат не найден'});const {q,before}=z.object({q:z.string().trim().max(100).optional(),before:z.coerce.number().int().positive().optional()}).parse(req.query);const rows=await db.message.findMany({where:{chatId:id,...(before?{id:{lt:before}}:{}),...(q?{text:{contains:q,mode:'insensitive'}}:{})},include:{savedBy:{where:{userId:s.userId},select:{id:true}},replyTo:{select:{id:true,text:true,senderId:true}},reactions:true,attachment:{select:{id:true,name:true,mime:true,size:true}}},orderBy:{id:'desc'},take:51});const hasMore=rows.length>50;const messages=rows.slice(0,50);const chat=await db.chat.findUnique({where:{id},select:{kind:true}});const blockedDirect=chat?.kind==='direct'&&await isDirectBlocked(id,s.userId);let deliveryCounts=new Map<number,number>();if(chat?.kind==='direct'&&!blockedDirect&&messages.length){const received=messages.filter(m=>m.senderId!==s.userId);if(received.length){const inserted=await db.messageDelivery.createMany({data:received.map(m=>({messageId:m.id,userId:s.userId})),skipDuplicates:true});if(inserted.count)for(const senderId of new Set(received.map(m=>m.senderId)))io.to(`user:${senderId}`).emit('delivery:update',{chatId:id});}const totals=await db.messageDelivery.groupBy({by:['messageId'],where:{messageId:{in:messages.map(m=>m.id)}},_count:{_all:true}});deliveryCounts=new Map(totals.map(x=>[x.messageId,x._count._all]));}let counts=new Map<number,number>();if(chat?.kind==='channel'&&messages.length){const viewed=messages.filter(m=>m.senderId!==s.userId).map(m=>({messageId:m.id,userId:s.userId}));const inserted=viewed.length?await db.messageView.createMany({data:viewed,skipDuplicates:true}):{count:0};const totals=await db.messageView.groupBy({by:['messageId'],where:{messageId:{in:messages.map(m=>m.id)}},_count:{_all:true}});counts=new Map(totals.map(x=>[x.messageId,x._count._all]));if(inserted.count){const recipients=await db.member.findMany({where:{chatId:id,userId:{not:s.userId}},select:{userId:true}});for(const recipient of recipients)io.to(`user:${recipient.userId}`).emit('message:refresh',{chatId:id});}}if(!blockedDirect&&!q&&!before&&messages.length){const changed=await db.member.updateMany({where:{chatId:id,userId:s.userId,lastReadId:{lt:messages[0].id}},data:{lastReadId:messages[0].id}});if(changed.count)await notifyChat(id,'read',{chatId:id,userId:s.userId,lastReadId:messages[0].id});}messages.reverse();return {messages:messages.map(({savedBy,...message})=>({...message,saved:savedBy.length>0,viewCount:counts.get(message.id)||0,delivered:(deliveryCounts.get(message.id)||0)>0})),nextCursor:hasMore?messages[0].id:null};});
 app.post('/api/chats/:id/messages',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=z.coerce.number().int().positive().parse((req.params as any).id);const {text,replyToId}=z.object({text:z.string().trim().min(1).max(4000),replyToId:z.number().int().positive().optional()}).parse(req.body);if(!await member(id,s.userId))return reply.code(404).send({error:'Чат не найден'});const chat=await db.chat.findUnique({where:{id}});const membership=await member(id,s.userId);if(chat?.kind==='channel'&&!['owner','admin'].includes(membership!.role))return reply.code(403).send({error:'Только администраторы могут публиковать в канале'});if(chat?.kind==='direct'){const others=await db.member.findMany({where:{chatId:id,userId:{not:s.userId}}});for(const other of others)if(!await canDirectMessage(s.userId,other.userId))return reply.code(403).send({error:'Общение с пользователем недоступно'});}if(replyToId&&!await db.message.findFirst({where:{id:replyToId,chatId:id}}))return reply.code(400).send({error:'Сообщение для ответа не найдено'});const message=await db.message.create({data:{chatId:id,senderId:s.userId,text,replyToId},include:{replyTo:{select:{id:true,text:true,senderId:true}},reactions:true,attachment:{select:{id:true,name:true,mime:true,size:true}}}});await notifyChat(id,'message',message);return {message};});
@@ -266,6 +291,24 @@ app.post('/api/users/:id/block',async(req,reply)=>{const s=await auth(req,reply)
 app.delete('/api/users/:id/block',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);await db.block.deleteMany({where:{blockerId:s.userId,blockedId:id}});return {ok:true};});
 app.post('/api/users/:id/report',{config:{rateLimit:{max:10,timeWindow:'1 hour'}}},async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);const {reason}=z.object({reason:z.string().trim().min(5).max(1000)}).parse(req.body);if(id===s.userId)return reply.code(400).send({error:'Нельзя пожаловаться на себя'});if(!await db.user.findUnique({where:{id}}))return reply.code(404).send({error:'Пользователь не найден'});await db.report.create({data:{reporterId:s.userId,reportedId:id,reason}});return {ok:true};});
 app.get('/api/follows',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;return {ids:(await db.follow.findMany({where:{followerId:s.userId},select:{followingId:true}})).map(x=>x.followingId)};});
+app.get('/api/friends', async (req, reply) => {
+  const s = await auth(req, reply);
+  if (!s) return;
+  const excluded = await blockedIds(s.userId);
+  const mutual = await db.follow.findMany({
+    where: {
+      followerId: s.userId,
+      followingId: {notIn: excluded},
+      following: {
+        suspended: false,
+        following: {some: {followingId: s.userId}},
+      },
+    },
+    select: {following: {select: publicUser}},
+    orderBy: {followingId: 'asc'},
+  });
+  return {users: mutual.map(row => row.following)};
+});
 app.post('/api/users/:id/follow',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);if(id===s.userId)return reply.code(400).send({error:'Нельзя подписаться на себя'});if(!await db.user.findUnique({where:{id}})||await blocked(s.userId,id))return reply.code(404).send({error:'Пользователь не найден'});await db.follow.upsert({where:{followerId_followingId:{followerId:s.userId,followingId:id}},create:{followerId:s.userId,followingId:id},update:{}});return {ok:true};});
 app.delete('/api/users/:id/follow',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const id=intId((req.params as any).id);await db.follow.deleteMany({where:{followerId:s.userId,followingId:id}});return {ok:true};});
 app.get('/api/posts',async(req,reply)=>{const s=await auth(req,reply);if(!s)return;const q=z.object({cursor:z.coerce.number().int().positive().optional(),tab:z.enum(['all','following']).default('all'),authorId:z.coerce.number().int().positive().optional(),q:z.string().max(100).optional()}).parse(req.query);const exclude=await blockedIds(s.userId);const following=q.tab==='following'?(await db.follow.findMany({where:{followerId:s.userId},select:{followingId:true}})).map(f=>f.followingId):undefined;const rows=await db.post.findMany({where:{authorId:{notIn:exclude,...(following?{in:following}:{}),...(q.authorId?{equals:q.authorId}:{})},...(q.cursor?{id:{lt:q.cursor}}:{}),...(q.q?{text:{contains:q.q,mode:'insensitive'}}:{})},orderBy:{id:'desc'},take:21,include:{author:{select:publicUser},image:{select:{id:true}},_count:{select:{likes:true,comments:true}},likes:{where:{userId:s.userId},select:{userId:true}}}});const more=rows.length>20;const posts=rows.slice(0,20).map(({likes,...post})=>({...post,liked:likes.length>0}));return {posts,nextCursor:more?posts[posts.length-1].id:null};});
