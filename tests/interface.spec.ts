@@ -103,8 +103,11 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
     page.getByRole("complementary", { name: "Сведения о чате" }),
   ).toHaveCount(0);
   const layout = await page.evaluate(() => {
+    const rail = document
+      .querySelector(".workspace-rail")!
+      .getBoundingClientRect();
     const list = document
-      .querySelector(".conversation-list")!
+      .querySelector(".workspace-inbox")!
       .getBoundingClientRect();
     const chat = document
       .querySelector(".conversation-screen")!
@@ -113,22 +116,23 @@ test("desktop keeps the chat list beside a full-height conversation", async ({
       .querySelector(".composer")!
       .getBoundingClientRect();
     return {
-      sidebarWidth: document
-        .querySelector(".workspace-sidebar")!
-        .getBoundingClientRect().width,
-      adjacent: chat.left >= list.right && chat.left - list.right <= 12,
+      railShare: rail.width / innerWidth,
+      listShare: list.width / innerWidth,
+      railGap: list.left - rail.right,
+      chatGap: chat.left - list.right,
       wide: chat.width > 650,
       visibleComposer: composer.bottom <= innerHeight,
       overflow: document.documentElement.scrollWidth > innerWidth,
     };
   });
-  expect(layout).toEqual({
-    sidebarWidth: 280,
-    adjacent: true,
-    wide: true,
-    visibleComposer: true,
-    overflow: false,
-  });
+  expect(layout.railShare).toBeCloseTo(0.052, 2);
+  expect(layout.listShare).toBeCloseTo(0.265, 2);
+  for (const gap of [layout.railGap, layout.chatGap]) {
+    expect(gap).toBeGreaterThan(0);
+    expect(gap).toBeLessThanOrEqual(16);
+  }
+  expect(layout.wide && layout.visibleComposer).toBe(true);
+  expect(layout.overflow).toBe(false);
 });
 
 test("mobile switches between list and chat and keeps navigation out of the composer", async ({
